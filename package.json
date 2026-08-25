@@ -1,0 +1,15 @@
+{
+  "name": "twain",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Twain — Never the twain shall meet. A dependency-free daily two-line path puzzle.",
+  "scripts": {
+    "test": "node --test",
+    "visual-qa": "node .agents/skills/visual-qa/scripts/run.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

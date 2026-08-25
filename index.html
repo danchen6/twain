@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Play today's Twain puzzle run. Never the twain shall meet."
+    />
+    <meta name="theme-color" content="#f7f5f2" />
+    <title>Twain — Never the twain shall meet</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="icon" href="./assets/twain-mark.svg" type="image/svg+xml" />
+    <script type="module" src="./src/main.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Twain home">
+        <img
+          class="brand-mark"
+          src="./assets/twain-mark.svg"
+          alt=""
+          aria-hidden="true"
+        />
+        <span>Twain</span>
+      </a>
+      <p class="header-date" id="dailyDate" aria-label="Today's puzzle date">
+        Today
+      </p>
+      <div class="header-actions">
+        <button
+          class="header-icon-button"
+          id="helpButton"
+          type="button"
+          aria-label="How to play"
+          aria-haspopup="dialog"
+          aria-controls="howToDialog"
+        >
+          <span aria-hidden="true">?</span>
+        </button>
+        <button
+          class="header-icon-button"
+          id="shareButton"
+          type="button"
+          aria-label="Share today's Twain"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M12 15V3m0 0L8 7m4-4 4 4" />
+            <path d="M5 10v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="page-shell">
+      <section class="game-card" aria-label="Twain puzzle">
+        <div class="game-toolbar">
+          <div class="timer" id="dailyTimer" aria-label="Daily elapsed time, paused">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <circle cx="12" cy="13" r="8" />
+              <path d="M12 9v4l2.75 1.75M9 2h6M12 2v3" />
+            </svg>
+            <span id="timerValue">00:00</span>
+          </div>
+
+          <div
+            class="daily-progress"
+            id="dailyProgress"
+            role="progressbar"
+            aria-label="Today's progress"
+            aria-valuemin="0"
+            aria-valuemax="5"
+            aria-valuenow="0"
+          >
+            <div class="daily-progress-track" id="dailyProgressTrack" aria-hidden="true"></div>
+          </div>
+
+          <button class="pill-button compact" id="clearButton" type="button">
+            Clear
+          </button>
+        </div>
+
+        <div class="board-stage">
+          <div
+            class="board"
+            id="board"
+            role="application"
+            tabindex="0"
+            aria-label="Daily Twain puzzle board"
+            aria-describedby="boardInstructions"
+          ></div>
+
+          <section
+            class="board-completion"
+            id="completionOverlay"
+            aria-labelledby="completionTitle"
+            aria-describedby="completionStats completionCountdown"
+            hidden
+          >
+            <div class="celebration-burst" aria-hidden="true"></div>
+            <div class="completion-panel">
+              <h2 id="completionTitle">Nicely done!</h2>
+              <div class="completion-details">
+                <p id="completionStats">0 hints</p>
+                <p id="completionCountdown" hidden>
+                  Come back in 00:00:00
+                </p>
+              </div>
+              <div class="completion-actions" id="completionActions">
+                <button
+                  class="pill-button filled"
+                  id="continueButton"
+                  type="button"
+                >
+                  Next level
+                </button>
+                <button
+                  class="pill-button filled"
+                  id="shareResultButton"
+                  type="button"
+                  hidden
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="M12 15V3m0 0L8 7m4-4 4 4" />
+                    <path d="M5 10v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8" />
+                  </svg>
+                  Share
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div class="game-controls">
+          <button class="action-button" id="undoButton" type="button">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="m9 7-5 5 5 5" />
+              <path d="M5 12h8.5a5.5 5.5 0 0 1 5.5 5.5V19" />
+            </svg>
+            Undo
+          </button>
+          <button class="action-button primary" id="hintButton" type="button">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M9 18h6M10 21h4" />
+              <path d="M8.4 15.1A6 6 0 1 1 15.6 15c-.9.65-1.35 1.3-1.35 2h-4.5c0-.7-.45-1.3-1.35-1.9Z" />
+            </svg>
+            Hint
+          </button>
+        </div>
+
+        <div
+          class="visually-hidden"
+          id="liveAnnouncer"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          Start at 1 or A. Fill every cell with the two lines.
+        </div>
+        <p class="visually-hidden" id="boardInstructions">
+          Draw the Number line from 1 through its numbered clues and the Letter
+          line from A through its lettered clues. The lines cannot share cells,
+          and together they must fill every cell.
+        </p>
+      </section>
+
+    </main>
+
+    <dialog class="how-to-dialog" id="howToDialog" aria-labelledby="howToTitle">
+      <div class="how-to-panel">
+        <div class="how-to-header">
+          <h2 id="howToTitle">How to play</h2>
+          <button
+            class="dialog-close"
+            id="closeHowToButton"
+            type="button"
+            aria-label="Close how to play"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+        <div class="how-to-grid">
+          <div class="rule-card">
+            <div
+              class="rule-visual connect-visual is-twain"
+              id="connectVisual"
+              aria-hidden="true"
+            >
+              <span class="connect-sample line-a">
+                <b>1</b><i></i><b>2</b>
+              </span>
+              <span class="connect-sample line-b">
+                <b>A</b><i></i><b>B</b>
+              </span>
+            </div>
+            <div>
+              <h3 id="firstRuleTitle">Guide both lines</h3>
+              <p id="firstRuleCopy">
+                Start at 1 or A and follow each sequence in order.
+              </p>
+            </div>
+          </div>
+          <div class="rule-card">
+            <div class="rule-visual fill-visual" aria-hidden="true">
+              <svg viewBox="0 0 64 52">
+                <path d="M8 43V9h16v34h16V9h16v34" />
+                <path class="grid" d="M8 26h48M24 9v34M40 9v34" />
+              </svg>
+            </div>
+            <div>
+              <h3 id="secondRuleTitle">Fill together</h3>
+              <p id="secondRuleCopy">
+                Cover every cell between both lines. They cannot share a cell
+                or cross a wall.
+              </p>
+            </div>
+          </div>
+        </div>
+        <p class="keyboard-note" id="keyboardInstructions">
+          Keyboard: <kbd>N</kbd>/<kbd>L</kbd> selects a line, arrows move, Enter
+          starts, Backspace undoes, <kbd>H</kbd> hints, and <kbd>R</kbd> clears.
+        </p>
+      </div>
+    </dialog>
+
+    <dialog
+      class="share-fallback-dialog"
+      id="shareFallbackDialog"
+      aria-labelledby="shareFallbackTitle"
+      aria-describedby="shareFallbackInstructions"
+    >
+      <div class="share-fallback-panel">
+        <div class="share-fallback-header">
+          <h2 id="shareFallbackTitle">Share Twain</h2>
+          <button
+            class="dialog-close"
+            id="closeShareFallbackButton"
+            type="button"
+            aria-label="Close sharing fallback"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+        <p id="shareFallbackInstructions">
+          Native sharing is unavailable here. Copy this instead.
+        </p>
+        <textarea
+          class="share-fallback-text"
+          id="shareFallbackText"
+          rows="4"
+          readonly
+          spellcheck="false"
+        ></textarea>
+        <div class="share-fallback-actions">
+          <button
+            class="pill-button filled"
+            id="copyShareFallbackButton"
+            type="button"
+          >
+            Copy
+          </button>
+        </div>
+      </div>
+    </dialog>
+
+    <div
+      class="share-feedback"
+      id="shareFeedback"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      hidden
+    ></div>
+  </body>
+</html>
