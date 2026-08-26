@@ -14,7 +14,7 @@ The full UI is localized in Traditional Chinese (`繁體中文`, `zh-TW`), Engli
 
 Shared links publish a versioned rich preview built from real Twain gameplay. Add to Home Screen uses dedicated opaque icons and a standalone manifest on supported browsers; Twain remains a network-served static game and does not claim offline support.
 
-Completing the full daily run advances a browser-local streak (not shown in the UI yet). Optional Google Analytics is configured for the production web stream but remains off in each browser until the player explicitly allows analytics through the localized privacy notice; undecided and declined sessions load no Google tag. See [docs/analytics.md](docs/analytics.md) for the event and privacy contract.
+Completing the full daily run advances a browser-local streak (not shown in the UI yet). Optional Google Analytics is configured for the production web stream but remains off until the player explicitly allows analytics through the localized privacy notice. An allowance persists in this browser; a decline lasts only for the current page session, remains tag-free, and prompts again in a later session. See [docs/analytics.md](docs/analytics.md) for the event and privacy contract.
 
 Every board is generated locally from complete witness lines, so it is always solvable. A bounded solver ranks deterministic candidate pools by search effort and solution density rather than assuming that fewer clues or more walls are automatically harder. The stage seed also selects one of several curated, high-contrast route palettes.
 

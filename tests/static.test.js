@@ -83,7 +83,7 @@ test("optional analytics remains consent-gated and absent from static markup", a
   assert.doesNotMatch(html, /googletagmanager|google-analytics/);
   assert.match(
     analyticsSource,
-    /readAnalyticsConsent\(storage\)\?\.state !== "granted"/,
+    /readAnalyticsConsent\(storage, sessionStorage\)\?\.state !== "granted"/,
   );
   assert.match(main, /canonicalizeLocation\(\);\s*analytics\.initialize\(\);/);
 });

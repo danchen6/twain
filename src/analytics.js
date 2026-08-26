@@ -1,5 +1,5 @@
-export const ANALYTICS_CONSENT_STORAGE_KEY = "twain:analytics-consent:v1";
-export const ANALYTICS_CONSENT_VERSION = 1;
+export const ANALYTICS_CONSENT_STORAGE_KEY = "twain:analytics-consent:v2";
+export const ANALYTICS_CONSENT_VERSION = 2;
 export const ANALYTICS_CONSENT_STATES = Object.freeze([
   "granted",
   "denied",
@@ -13,6 +13,9 @@ export const ANALYTICS_CONFIG = Object.freeze({
 const EVENT_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
 const PARAMETER_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
 const MAX_EVENT_PARAMETERS = 25;
+const LEGACY_ANALYTICS_CONSENT_STORAGE_KEYS = Object.freeze([
+  "twain:analytics-consent:v1",
+]);
 
 export function isGoogleTagId(value) {
   return typeof value === "string" && /^(?:G|GT)-[A-Z0-9]+$/.test(value);
@@ -48,7 +51,7 @@ function sanitizeEventParameters(parameters) {
   return sanitized;
 }
 
-function defaultStorage() {
+function defaultPersistentStorage() {
   try {
     return globalThis.localStorage;
   } catch {
@@ -56,14 +59,19 @@ function defaultStorage() {
   }
 }
 
-export function readAnalyticsConsent(storage = undefined) {
+function defaultSessionStorage() {
   try {
-    const targetStorage = storage === undefined ? defaultStorage() : storage;
-    if (typeof targetStorage?.getItem !== "function") {
-      return null;
-    }
+    return globalThis.sessionStorage;
+  } catch {
+    return null;
+  }
+}
 
-    const stored = targetStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY);
+function readConsentRecord(storage) {
+  try {
+    if (typeof storage?.getItem !== "function") return null;
+
+    const stored = storage.getItem(ANALYTICS_CONSENT_STORAGE_KEY);
     if (!stored) {
       return null;
     }
@@ -90,10 +98,70 @@ export function readAnalyticsConsent(storage = undefined) {
   }
 }
 
+function discardLegacyConsent(storage) {
+  for (const key of LEGACY_ANALYTICS_CONSENT_STORAGE_KEYS) {
+    try {
+      storage?.removeItem?.(key);
+    } catch {
+      // Legacy consent never authorizes the current analytics data boundary.
+    }
+  }
+}
+
+export function readAnalyticsConsent(
+  storage = undefined,
+  sessionStorage = undefined,
+) {
+  const persistentStorage =
+    storage === undefined ? defaultPersistentStorage() : storage;
+  const temporaryStorage =
+    sessionStorage === undefined ? defaultSessionStorage() : sessionStorage;
+
+  discardLegacyConsent(persistentStorage);
+  discardLegacyConsent(temporaryStorage);
+
+  const temporaryRecord = readConsentRecord(temporaryStorage);
+
+  if (temporaryRecord?.state === "denied") {
+    try {
+      persistentStorage?.removeItem?.(ANALYTICS_CONSENT_STORAGE_KEY);
+    } catch {
+      // The current session denial still takes precedence.
+    }
+    return temporaryRecord;
+  }
+
+  const persistentRecord = readConsentRecord(persistentStorage);
+  if (persistentRecord?.state === "granted") {
+    return persistentRecord;
+  }
+
+  if (persistentRecord?.state === "denied") {
+    try {
+      if (
+        typeof temporaryStorage?.setItem === "function" &&
+        typeof persistentStorage?.removeItem === "function"
+      ) {
+        temporaryStorage.setItem(
+          ANALYTICS_CONSENT_STORAGE_KEY,
+          JSON.stringify(persistentRecord),
+        );
+        persistentStorage.removeItem(ANALYTICS_CONSENT_STORAGE_KEY);
+      }
+    } catch {
+      // Keep honoring the persistent denial until migration can succeed.
+    }
+    return persistentRecord;
+  }
+
+  return null;
+}
+
 export function writeAnalyticsConsent(
   state,
   {
     storage = undefined,
+    sessionStorage = undefined,
     now = new Date(),
   } = {},
 ) {
@@ -113,15 +181,24 @@ export function writeAnalyticsConsent(
   };
 
   try {
-    const targetStorage = storage === undefined ? defaultStorage() : storage;
-    if (typeof targetStorage?.setItem !== "function") {
-      return null;
-    }
+    const persistentStorage =
+      storage === undefined ? defaultPersistentStorage() : storage;
+    const temporaryStorage =
+      sessionStorage === undefined ? defaultSessionStorage() : sessionStorage;
+    const serialized = JSON.stringify(record);
 
-    targetStorage.setItem(
-      ANALYTICS_CONSENT_STORAGE_KEY,
-      JSON.stringify(record),
-    );
+    discardLegacyConsent(persistentStorage);
+    discardLegacyConsent(temporaryStorage);
+
+    if (state === "granted") {
+      if (typeof persistentStorage?.setItem !== "function") return null;
+      temporaryStorage?.removeItem?.(ANALYTICS_CONSENT_STORAGE_KEY);
+      persistentStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, serialized);
+    } else {
+      if (typeof temporaryStorage?.setItem !== "function") return null;
+      persistentStorage?.removeItem?.(ANALYTICS_CONSENT_STORAGE_KEY);
+      temporaryStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, serialized);
+    }
   } catch {
     return null;
   }
@@ -137,6 +214,7 @@ export function createAnalyticsClient(config = ANALYTICS_CONFIG) {
     windowObject = globalThis.window,
     documentObject = globalThis.document,
     storage = undefined,
+    sessionStorage = undefined,
   } = {}) {
     if (active) {
       return true;
@@ -145,7 +223,7 @@ export function createAnalyticsClient(config = ANALYTICS_CONFIG) {
     if (
       !config?.enabled ||
       !isGoogleTagId(config.measurementId) ||
-      readAnalyticsConsent(storage)?.state !== "granted" ||
+      readAnalyticsConsent(storage, sessionStorage)?.state !== "granted" ||
       !windowObject ||
       !documentObject?.head ||
       typeof documentObject.createElement !== "function"

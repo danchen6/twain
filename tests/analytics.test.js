@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   ANALYTICS_CONFIG,
   ANALYTICS_CONSENT_STORAGE_KEY,
+  ANALYTICS_CONSENT_VERSION,
   createAnalyticsClient,
   isGoogleTagId,
   readAnalyticsConsent,
@@ -26,38 +27,54 @@ test("production analytics targets the approved GA4 stream without debug mode", 
   assert.equal(Object.isFrozen(ANALYTICS_CONFIG), true);
 });
 
-function fakeEnvironment(consent = "granted") {
-  const scripts = [];
+function fakeStorage(consent = null, version = ANALYTICS_CONSENT_VERSION) {
   const values = new Map();
   if (consent !== null) {
     values.set(
       ANALYTICS_CONSENT_STORAGE_KEY,
       JSON.stringify({
-        version: 1,
+        version,
         state: consent,
         updatedAt: "2026-08-26T01:02:03.000Z",
       }),
     );
   }
   return {
+    getItem: (key) => values.get(key) ?? null,
+    removeItem: (key) => values.delete(key),
+    setItem: (key, value) => values.set(key, value),
+  };
+}
+
+function fakeEnvironment({
+  persistentConsent = "granted",
+  sessionConsent = null,
+} = {}) {
+  const scripts = [];
+  return {
     documentObject: {
       createElement: () => ({}),
       head: { append: (script) => scripts.push(script) },
     },
     scripts,
-    storage: {
-      getItem: (key) => values.get(key) ?? null,
-      setItem: (key, value) => values.set(key, value),
-    },
+    sessionStorage: fakeStorage(sessionConsent),
+    storage: fakeStorage(persistentConsent),
     windowObject: {},
   };
 }
 
 test("analytics stays network-silent without all configuration gates", () => {
   for (const [config, consent] of [
-    [{ enabled: false, measurementId: "G-ABC123" }, "granted"],
-    [{ enabled: true, measurementId: "" }, "granted"],
-    [{ enabled: true, measurementId: "G-ABC123" }, null],
+    [{ enabled: false, measurementId: "G-ABC123" }, {}],
+    [{ enabled: true, measurementId: "" }, {}],
+    [
+      { enabled: true, measurementId: "G-ABC123" },
+      { persistentConsent: null },
+    ],
+    [
+      { enabled: true, measurementId: "G-ABC123" },
+      { persistentConsent: null, sessionConsent: "denied" },
+    ],
   ]) {
     const environment = fakeEnvironment(consent);
     const client = createAnalyticsClient(config);
@@ -68,31 +85,142 @@ test("analytics stays network-silent without all configuration gates", () => {
   }
 });
 
-test("analytics consent records are versioned, timestamped, and validated", () => {
-  const environment = fakeEnvironment(null);
-  const record = writeAnalyticsConsent("granted", {
-    storage: environment.storage,
+test("analytics grants persist while denials expire with the page session", () => {
+  const persistentStorage = fakeStorage();
+  const sessionStorage = fakeStorage();
+  const granted = writeAnalyticsConsent("granted", {
+    storage: persistentStorage,
+    sessionStorage,
     now: new Date("2026-08-26T04:05:06.000Z"),
   });
 
-  assert.deepEqual(record, {
-    version: 1,
+  assert.deepEqual(granted, {
+    version: ANALYTICS_CONSENT_VERSION,
     state: "granted",
     updatedAt: "2026-08-26T04:05:06.000Z",
   });
-  assert.deepEqual(readAnalyticsConsent(environment.storage), record);
+  assert.deepEqual(
+    readAnalyticsConsent(persistentStorage, sessionStorage),
+    granted,
+  );
+  assert.equal(
+    sessionStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY),
+    null,
+  );
+
+  const denied = writeAnalyticsConsent("denied", {
+    storage: persistentStorage,
+    sessionStorage,
+    now: new Date("2026-08-26T05:06:07.000Z"),
+  });
+  assert.deepEqual(
+    readAnalyticsConsent(persistentStorage, sessionStorage),
+    denied,
+  );
+  assert.equal(
+    persistentStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY),
+    null,
+  );
+  assert.equal(
+    readAnalyticsConsent(persistentStorage, fakeStorage()),
+    null,
+  );
+});
+
+test("analytics migrates misplaced persistent denials into the current session", () => {
+  const persistentStorage = fakeStorage("denied");
+  const sessionStorage = fakeStorage();
+  const migrated = readAnalyticsConsent(persistentStorage, sessionStorage);
+
+  assert.equal(migrated.state, "denied");
+  assert.equal(
+    persistentStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY),
+    null,
+  );
+  assert.deepEqual(
+    readAnalyticsConsent(persistentStorage, sessionStorage),
+    migrated,
+  );
+  assert.equal(
+    readAnalyticsConsent(persistentStorage, fakeStorage()),
+    null,
+  );
+});
+
+test("a session denial overrides and removes a persistent grant", () => {
+  const persistentStorage = fakeStorage("granted");
+  const sessionStorage = fakeStorage("denied");
+
+  assert.equal(
+    readAnalyticsConsent(persistentStorage, sessionStorage)?.state,
+    "denied",
+  );
+  assert.equal(
+    persistentStorage.getItem(ANALYTICS_CONSENT_STORAGE_KEY),
+    null,
+  );
+});
+
+test("v1 consent is discarded instead of authorizing the expanded data boundary", () => {
+  const legacyKey = "twain:analytics-consent:v1";
+  const persistentStorage = fakeStorage();
+  const sessionStorage = fakeStorage();
+  const legacyGrant = JSON.stringify({
+    version: 1,
+    state: "granted",
+    updatedAt: "2026-08-26T01:02:03.000Z",
+  });
+  persistentStorage.setItem(legacyKey, legacyGrant);
+  sessionStorage.setItem(legacyKey, legacyGrant);
+
+  assert.equal(readAnalyticsConsent(persistentStorage, sessionStorage), null);
+  assert.equal(persistentStorage.getItem(legacyKey), null);
+  assert.equal(sessionStorage.getItem(legacyKey), null);
+});
+
+test("analytics consent records are versioned, timestamped, and validated", () => {
+  const persistentStorage = fakeStorage();
+  const sessionStorage = fakeStorage();
+
   assert.throws(
-    () => writeAnalyticsConsent("pending", { storage: environment.storage }),
+    () =>
+      writeAnalyticsConsent("pending", {
+        storage: persistentStorage,
+        sessionStorage,
+      }),
     RangeError,
   );
-  environment.storage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "not-json");
-  assert.equal(readAnalyticsConsent(environment.storage), null);
-  environment.storage.setItem(
-    ANALYTICS_CONSENT_STORAGE_KEY,
-    JSON.stringify({ version: 1, state: "granted", updatedAt: "2026-08-26" }),
+  persistentStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "not-json");
+  assert.equal(
+    readAnalyticsConsent(persistentStorage, sessionStorage),
+    null,
   );
-  assert.equal(readAnalyticsConsent(environment.storage), null);
-  assert.equal(writeAnalyticsConsent("denied", { storage: null }), null);
+  persistentStorage.setItem(
+    ANALYTICS_CONSENT_STORAGE_KEY,
+    JSON.stringify({
+      version: ANALYTICS_CONSENT_VERSION,
+      state: "granted",
+      updatedAt: "2026-08-26",
+    }),
+  );
+  assert.equal(
+    readAnalyticsConsent(persistentStorage, sessionStorage),
+    null,
+  );
+  assert.equal(
+    writeAnalyticsConsent("granted", {
+      storage: null,
+      sessionStorage,
+    }),
+    null,
+  );
+  assert.equal(
+    writeAnalyticsConsent("denied", {
+      storage: null,
+      sessionStorage: null,
+    }),
+    null,
+  );
 });
 
 test("analytics initializes one privacy-limited Google tag and queues events", () => {

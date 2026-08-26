@@ -9,7 +9,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ANALYTICS_CONFIG } from "../../../../src/analytics.js";
+import {
+  ANALYTICS_CONFIG,
+  ANALYTICS_CONSENT_STORAGE_KEY,
+  ANALYTICS_CONSENT_VERSION,
+} from "../../../../src/analytics.js";
 
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(SCRIPT_DIRECTORY, "../../../..");
@@ -414,17 +418,29 @@ async function main() {
           }
           globalThis.Date = FixedDate;
           try {
+            const consentKey = ${JSON.stringify(ANALYTICS_CONSENT_STORAGE_KEY)};
+            const legacyConsentKey = 'twain:analytics-consent:v1';
+            localStorage.removeItem(legacyConsentKey);
+            sessionStorage.removeItem(legacyConsentKey);
             if (requestedConsent === 'granted' || requestedConsent === 'denied') {
-              localStorage.setItem('twain:analytics-consent:v1', JSON.stringify({
-                version: 1,
+              const consentRecord = JSON.stringify({
+                version: ${ANALYTICS_CONSENT_VERSION},
                 state: requestedConsent,
                 updatedAt: new NativeDate(globalThis.__twainVisualNow).toISOString(),
-              }));
+              });
+              if (requestedConsent === 'granted') {
+                sessionStorage.removeItem(consentKey);
+                localStorage.setItem(consentKey, consentRecord);
+              } else {
+                localStorage.removeItem(consentKey);
+                sessionStorage.setItem(consentKey, consentRecord);
+              }
             } else if (requestedConsent === 'unset') {
-              localStorage.removeItem('twain:analytics-consent:v1');
+              localStorage.removeItem(consentKey);
+              sessionStorage.removeItem(consentKey);
             }
           } catch {
-            // about:blank and locked-down contexts may not expose localStorage.
+            // about:blank and locked-down contexts may not expose storage.
           }
         })();`,
       },
@@ -674,14 +690,22 @@ async function main() {
         const helpButtonStyle = getComputedStyle(helpButton);
         const helpButtonRect = helpButton.getBoundingClientRect();
         const timerIcon = document.querySelector('#dailyTimer svg');
-        const storedJson = (key) => {
+        const storedJson = (storage, key) => {
           try {
-            const value = localStorage.getItem(key);
+            const value = storage.getItem(key);
             return value === null ? null : JSON.parse(value);
           } catch {
             return null;
           }
         };
+        const analyticsPersistentConsent = storedJson(
+          localStorage,
+          ${JSON.stringify(ANALYTICS_CONSENT_STORAGE_KEY)},
+        );
+        const analyticsSessionConsent = storedJson(
+          sessionStorage,
+          ${JSON.stringify(ANALYTICS_CONSENT_STORAGE_KEY)},
+        );
         return {
           activeElement: document.activeElement?.id || document.activeElement?.className || document.activeElement?.tagName,
           activeLanguageOption: document.activeElement?.dataset?.locale ?? null,
@@ -753,15 +777,20 @@ async function main() {
               ? { measurementId: command[1], parameters: command[2] }
               : null;
           })(),
-          analyticsConsent: storedJson('twain:analytics-consent:v1'),
+          analyticsConsent: analyticsSessionConsent ?? analyticsPersistentConsent,
           analyticsDataLayerPresent: Array.isArray(window.dataLayer),
+          analyticsPersistentConsent,
+          analyticsSessionConsent,
           analyticsTagPresent: Boolean(document.querySelector('#twain-google-tag')),
           privacyBannerCopy: document.querySelector('#privacyBannerCopy').textContent.trim(),
           privacyBannerHidden: document.querySelector('#privacyBanner').hidden,
           privacyBannerTitle: document.querySelector('#privacyBannerTitle').textContent.trim(),
           privacyBodyClass: document.body.classList.contains('has-privacy-banner'),
           privacyDialogOpen: document.querySelector('#privacyDialog').open,
+          privacyDialogIntro: document.querySelector('#privacyDialogIntro').textContent.trim(),
           privacyDialogTitle: document.querySelector('#privacyDialogTitle').textContent.trim(),
+          privacyCollectCopy: document.querySelector('#privacyCollectCopy').textContent.trim(),
+          privacyAvoidCopy: document.querySelector('#privacyAvoidCopy').textContent.trim(),
           privacyPreferencesLabel: document.querySelector('#privacyPreferencesButton').textContent.trim(),
           privacyStatus: document.querySelector('#privacyStatus').textContent.trim(),
           progress: \`\${occupied}/\${hits.length}\`,
@@ -785,7 +814,7 @@ async function main() {
           status: document.querySelector('#liveAnnouncer').textContent,
           statusMessagePresent: Boolean(document.querySelector('#statusMessage')),
           statusPanelPresent: Boolean(document.querySelector('.status-panel')),
-          streak: storedJson('twain:streak:v1'),
+          streak: storedJson(localStorage, 'twain:streak:v1'),
           timer: document.querySelector('#timerValue').textContent,
           timerIconDisplay: getComputedStyle(timerIcon).display,
           timerLabel: document.querySelector('#dailyTimer').getAttribute('aria-label'),
@@ -1163,6 +1192,8 @@ async function main() {
       assert.equal(privacyState.privacyBannerTitle, "Privacy & analytics");
       assert.match(privacyState.privacyBannerCopy, /stays off until you allow it/);
       assert.equal(privacyState.analyticsConsent, null);
+      assert.equal(privacyState.analyticsPersistentConsent, null);
+      assert.equal(privacyState.analyticsSessionConsent, null);
       assert.equal(privacyState.analyticsTagPresent, false);
       assert.equal(privacyState.analyticsDataLayerPresent, false);
       const privacyLayout = await evaluate(`(() => {
@@ -1195,6 +1226,58 @@ async function main() {
         assert.ok(privacyLayout.decline.right <= privacyLayout.accept.left + 0.5);
       }
       await capture(`${viewport.width}x${viewport.height}-privacy-banner`);
+
+      await clickSelector("#privacyDetailsButton");
+      await delay(180);
+      const privacyDetailsState = await state();
+      assert.equal(privacyDetailsState.privacyDialogOpen, true);
+      assert.equal(privacyDetailsState.privacyDialogTitle, "Privacy & analytics");
+      assert.equal(
+        privacyDetailsState.privacyStatus,
+        "Current choice: not selected.",
+      );
+      assert.match(privacyDetailsState.privacyDialogIntro, /browsing session/);
+      assert.match(privacyDetailsState.privacyCollectCopy, /Enhanced Measurement/);
+      assert.match(
+        privacyDetailsState.privacyCollectCopy,
+        /outbound-link clicks/,
+      );
+      assert.match(privacyDetailsState.privacyAvoidCopy, /custom gameplay events/);
+      assert.equal(privacyDetailsState.activeElement, "closePrivacyButton");
+      const privacyDialogLayout = await evaluate(`(() => {
+        const panel = document.querySelector('.privacy-panel');
+        const rect = panel.getBoundingClientRect();
+        return {
+          bottom: rect.bottom,
+          clientHeight: panel.clientHeight,
+          innerHeight: window.innerHeight,
+          innerWidth: window.innerWidth,
+          left: rect.left,
+          right: rect.right,
+          scrollHeight: panel.scrollHeight,
+          top: rect.top,
+        };
+      })()`);
+      assert.ok(
+        privacyDialogLayout.left >= 0 &&
+          privacyDialogLayout.right <= privacyDialogLayout.innerWidth,
+      );
+      assert.ok(
+        privacyDialogLayout.top >= 0 &&
+          privacyDialogLayout.bottom <= privacyDialogLayout.innerHeight,
+      );
+      await capture(`${viewport.width}x${viewport.height}-privacy-dialog`);
+      if (viewport.width === 320) {
+        await evaluate(
+          "document.querySelector('.privacy-panel').scrollTop = document.querySelector('.privacy-panel').scrollHeight",
+        );
+        await delay(30);
+        await capture("320x800-privacy-dialog-bottom");
+        await evaluate("document.querySelector('.privacy-panel').scrollTop = 0");
+      }
+      await clickSelector("#closePrivacyButton");
+      await delay(30);
+      assert.equal((await state()).activeElement, "privacyDetailsButton");
     }
 
     await loadViewport({
@@ -1203,29 +1286,17 @@ async function main() {
       mobile: true,
       consent: "unset",
     });
-    await clickSelector("#privacyDetailsButton");
-    await delay(180);
-    let privacyState = await state();
-    assert.equal(privacyState.privacyDialogOpen, true);
-    assert.equal(privacyState.privacyDialogTitle, "Privacy & analytics");
-    assert.equal(privacyState.privacyStatus, "Current choice: not selected.");
-    assert.equal(privacyState.activeElement, "closePrivacyButton");
-    const privacyDialogLayout = await evaluate(`(() => {
-      const rect = document.querySelector('.privacy-panel').getBoundingClientRect();
-      return { bottom: rect.bottom, left: rect.left, right: rect.right, top: rect.top };
-    })()`);
-    assert.ok(privacyDialogLayout.left >= 0 && privacyDialogLayout.right <= 390);
-    assert.ok(privacyDialogLayout.top >= 0 && privacyDialogLayout.bottom <= 844);
-    await capture("390x844-privacy-dialog");
-    await clickSelector("#closePrivacyButton");
-    await delay(30);
-    assert.equal((await state()).activeElement, "privacyDetailsButton");
     await clickSelector("#bannerDeclineButton");
-    privacyState = await state();
+    let privacyState = await state();
     assert.equal(privacyState.privacyBannerHidden, true);
     assert.equal(privacyState.privacyBodyClass, false);
     assert.equal(privacyState.analyticsConsent.state, "denied");
-    assert.equal(privacyState.analyticsConsent.version, 1);
+    assert.equal(
+      privacyState.analyticsConsent.version,
+      ANALYTICS_CONSENT_VERSION,
+    );
+    assert.equal(privacyState.analyticsPersistentConsent, null);
+    assert.equal(privacyState.analyticsSessionConsent.state, "denied");
     assert.equal(privacyState.analyticsTagPresent, false);
     assert.equal(privacyState.analyticsDataLayerPresent, false);
     assert.deepEqual(analyticsRequests, []);
@@ -1240,18 +1311,50 @@ async function main() {
     privacyState = await state();
     assert.equal(privacyState.privacyBannerHidden, true);
     assert.equal(privacyState.analyticsConsent.state, "denied");
+    assert.equal(privacyState.analyticsPersistentConsent, null);
+    assert.equal(privacyState.analyticsSessionConsent.state, "denied");
     await clickSelector("#helpButton");
     assert.equal((await state()).privacyPreferencesLabel, "Privacy choices");
     await clickSelector("#privacyPreferencesButton");
+    await delay(180);
     privacyState = await state();
     assert.equal(privacyState.helpDialogOpen, false);
     assert.equal(privacyState.privacyDialogOpen, true);
     assert.equal(privacyState.privacyStatus, "Current choice: analytics declined.");
-    await clickSelector("#privacyAcceptButton");
+    assert.match(privacyState.privacyDialogIntro, /browsing session/);
+    assert.match(privacyState.privacyCollectCopy, /Enhanced Measurement/);
+    await capture("390x844-privacy-dialog-declined");
+    await clickSelector("#closePrivacyButton");
+    await evaluate(
+      `sessionStorage.removeItem(${JSON.stringify(ANALYTICS_CONSENT_STORAGE_KEY)})`,
+    );
+
+    await loadViewport({
+      width: 390,
+      height: 844,
+      mobile: true,
+      fresh: false,
+      consent: "preserve",
+    });
+    privacyState = await state();
+    assert.equal(privacyState.privacyBannerHidden, false);
+    assert.equal(privacyState.analyticsConsent, null);
+    assert.equal(privacyState.analyticsPersistentConsent, null);
+    assert.equal(privacyState.analyticsSessionConsent, null);
+    assert.equal(privacyState.analyticsTagPresent, false);
+    assert.equal(privacyState.analyticsDataLayerPresent, false);
+    assert.deepEqual(analyticsRequests, []);
+
+    await clickSelector("#bannerAcceptButton");
     await delay(30);
     privacyState = await state();
-    assert.equal(privacyState.privacyDialogOpen, false);
+    assert.equal(privacyState.privacyBannerHidden, true);
     assert.equal(privacyState.analyticsConsent.state, "granted");
+    assert.equal(
+      privacyState.analyticsPersistentConsent.state,
+      "granted",
+    );
+    assert.equal(privacyState.analyticsSessionConsent, null);
     assert.equal(privacyState.analyticsTagPresent, true);
     assert.equal(privacyState.analyticsDataLayerPresent, true);
     assert.deepEqual(privacyState.analyticsConfiguration, {
@@ -1262,8 +1365,6 @@ async function main() {
         allow_ad_personalization_signals: false,
       },
     });
-    assert.equal(privacyState.activeElement, "helpButton");
-
     for (let attempt = 0; attempt < 50 && analyticsRequests.length === 0; attempt += 1) {
       await delay(20);
     }
@@ -1280,6 +1381,8 @@ async function main() {
     });
     privacyState = await state();
     assert.equal(privacyState.analyticsConsent.state, "granted");
+    assert.equal(privacyState.analyticsPersistentConsent.state, "granted");
+    assert.equal(privacyState.analyticsSessionConsent, null);
     assert.equal(privacyState.analyticsTagPresent, true);
     assert.equal(privacyState.analyticsDataLayerPresent, true);
 
@@ -1295,11 +1398,13 @@ async function main() {
     await delay(100);
     privacyState = await state();
     assert.equal(privacyState.analyticsConsent.state, "denied");
+    assert.equal(privacyState.analyticsPersistentConsent, null);
+    assert.equal(privacyState.analyticsSessionConsent.state, "denied");
     assert.equal(privacyState.analyticsTagPresent, false);
     assert.equal(privacyState.analyticsDataLayerPresent, false);
     assert.equal(analyticsRequests.length, requestsBeforeRevocation);
     checks.push(
-      "privacy banner and details fit all maintained viewports; undecided and declined visits are tag-free, consent initializes only the configured intercepted GA tag, and active revocation reloads tag-free",
+      "privacy banner and Enhanced Measurement details fit all maintained viewports; session-only denial stays tag-free across reload, a new page session asks again, persistent consent initializes only the configured intercepted GA tag, and active revocation reloads tag-free",
     );
 
     await loadViewport({
@@ -1625,6 +1730,40 @@ async function main() {
     assert.equal(currentState.privacyBannerTitle, "Privacidade e análise");
     assert.match(currentState.privacyBannerCopy, /permanece desativado/);
     await capture("320x800-pt-br-privacy-banner");
+    await clickSelector("#privacyDetailsButton");
+    await delay(180);
+    currentState = await state();
+    assert.equal(currentState.privacyDialogOpen, true);
+    assert.match(currentState.privacyDialogIntro, /sessão de navegação/);
+    assert.match(currentState.privacyCollectCopy, /Enhanced Measurement/);
+    const portuguesePrivacyLayout = await evaluate(`(() => {
+      const panel = document.querySelector('.privacy-panel');
+      const rect = panel.getBoundingClientRect();
+      return {
+        bottom: rect.bottom,
+        innerHeight: window.innerHeight,
+        innerWidth: window.innerWidth,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+      };
+    })()`);
+    assert.ok(
+      portuguesePrivacyLayout.left >= 0 &&
+        portuguesePrivacyLayout.right <= portuguesePrivacyLayout.innerWidth,
+    );
+    assert.ok(
+      portuguesePrivacyLayout.top >= 0 &&
+        portuguesePrivacyLayout.bottom <= portuguesePrivacyLayout.innerHeight,
+    );
+    await capture("320x800-pt-br-privacy-dialog");
+    await evaluate(
+      "document.querySelector('.privacy-panel').scrollTop = document.querySelector('.privacy-panel').scrollHeight",
+    );
+    await delay(30);
+    await capture("320x800-pt-br-privacy-dialog-bottom");
+    await evaluate("document.querySelector('.privacy-panel').scrollTop = 0");
+    await clickSelector("#closePrivacyButton");
     await clickSelector("#bannerDeclineButton");
     await clickSelector("#languageButton");
     const languageMenuLayout = await evaluate(`(() => {

@@ -70,13 +70,13 @@ const ENGLISH = {
   privacyDialogTitle: "Privacy & analytics",
   closePrivacy: "Close privacy choices",
   privacyDialogIntro:
-    "Your choice is stored only in this browser and can be changed at any time.",
+    "Declining applies only to this browsing session; allowing analytics is saved in this browser. You can change your choice at any time.",
   privacyCollectTitle: "If you allow analytics",
   privacyCollectCopy:
-    "When Google Analytics is configured, Twain sends gameplay milestones, completion and stage time, hints, mistakes, streak totals, interface settings, and basic device, browser, and approximate location data collected by Google Analytics.",
-  privacyAvoidTitle: "What Twain does not send",
+    "With Google Analytics enabled, Twain sends gameplay milestones, completion and stage times, hints, mistakes, streak totals, and interface settings. Enhanced Measurement also records page views and, when applicable, scroll depth, outbound-link clicks, site searches, video engagement, file downloads, and form interactions. Google Analytics also receives page and link metadata, cookie-based pseudonymous identifiers, and basic device, browser, and approximate location data.",
+  privacyAvoidTitle: "Custom gameplay event limits",
   privacyAvoidCopy:
-    "Puzzle paths, individual moves, puzzle seeds, names, email addresses, account IDs, and free-text content are excluded.",
+    "Twain’s custom gameplay events exclude puzzle paths, individual moves, puzzle seeds, clue values, names, email addresses, account IDs, and free-text input. Enhanced Measurement may send the page and interaction metadata described above when applicable.",
   privacyStatusGranted: "Current choice: analytics allowed.",
   privacyStatusDenied: "Current choice: analytics declined.",
   privacyStatusUnset: "Current choice: not selected.",
@@ -215,13 +215,14 @@ const TRADITIONAL_CHINESE = {
   privacyDetails: "詳細資訊",
   privacyDialogTitle: "隱私與分析",
   closePrivacy: "關閉隱私設定",
-  privacyDialogIntro: "你的選擇只會儲存在這個瀏覽器中，隨時可以變更。",
+  privacyDialogIntro:
+    "拒絕只適用於這次瀏覽工作階段；允許分析則會儲存在這個瀏覽器中。你可以隨時變更選擇。",
   privacyCollectTitle: "同意分析後",
   privacyCollectCopy:
-    "設定 Google Analytics 後，Twain 會傳送遊戲里程碑、完成與各關時間、提示、錯誤、連續完成紀錄、介面設定，以及 Google Analytics 蒐集的基本裝置、瀏覽器與概略位置資料。",
-  privacyAvoidTitle: "Twain 不會傳送的資料",
+    "啟用 Google Analytics 後，Twain 會傳送遊戲里程碑、完成與各關時間、提示、錯誤、連續完成紀錄及介面設定。Enhanced Measurement 也會記錄頁面瀏覽，以及適用時的捲動深度、外部連結點擊、站內搜尋、影片互動、檔案下載與表單互動；Google Analytics 另會收到頁面與連結中繼資料、Cookie 型假名識別碼，以及基本裝置、瀏覽器與概略位置資料。",
+  privacyAvoidTitle: "自訂遊戲事件的界線",
   privacyAvoidCopy:
-    "謎題路徑、每一步操作、謎題 seed、姓名、email、帳號 ID 與自訂文字都不會傳送。",
+    "Twain 的自訂遊戲事件不包含解題路徑、個別移動、謎題 seed、線索值、姓名、電子郵件地址、account ID 或自由文字輸入。適用時，Enhanced Measurement 仍可能傳送上述頁面與互動中繼資料。",
   privacyStatusGranted: "目前選擇：允許分析。",
   privacyStatusDenied: "目前選擇：不同意分析。",
   privacyStatusUnset: "目前選擇：尚未選擇。",
@@ -347,13 +348,14 @@ const SIMPLIFIED_CHINESE = {
   privacyDetails: "详细信息",
   privacyDialogTitle: "隐私与分析",
   closePrivacy: "关闭隐私设置",
-  privacyDialogIntro: "你的选择只会保存在此浏览器中，并可随时更改。",
+  privacyDialogIntro:
+    "拒绝仅适用于本次浏览会话；允许分析则会保存在此浏览器中。你可以随时更改选择。",
   privacyCollectTitle: "同意分析后",
   privacyCollectCopy:
-    "配置 Google Analytics 后，Twain 会发送游戏里程碑、完成与各关时间、提示、错误、连续完成记录、界面设置，以及 Google Analytics 收集的基本设备、浏览器与大致位置数据。",
-  privacyAvoidTitle: "Twain 不会发送的数据",
+    "启用 Google Analytics 后，Twain 会发送游戏里程碑、完成与各关时间、提示、错误、连续完成记录及界面设置。Enhanced Measurement 也会记录页面浏览，以及适用时的滚动深度、外部链接点击、站内搜索、视频互动、文件下载与表单互动；Google Analytics 还会收到页面与链接元数据、基于 Cookie 的假名标识符，以及基本设备、浏览器与大致位置数据。",
+  privacyAvoidTitle: "自定义游戏事件的范围",
   privacyAvoidCopy:
-    "谜题路径、每一步操作、谜题 seed、姓名、电子邮箱、账号 ID 与自定义文本都不会发送。",
+    "Twain 的自定义游戏事件不包含解题路径、单步移动、谜题 seed、线索值、姓名、电子邮件地址、账号 ID 或自由文本输入。适用时，Enhanced Measurement 仍可能发送上述页面与互动元数据。",
   privacyStatusGranted: "当前选择：允许分析。",
   privacyStatusDenied: "当前选择：不同意分析。",
   privacyStatusUnset: "当前选择：尚未选择。",
@@ -483,13 +485,13 @@ const JAPANESE = {
   privacyDialogTitle: "プライバシーと分析",
   closePrivacy: "プライバシー設定を閉じる",
   privacyDialogIntro:
-    "選択内容はこのブラウザーにのみ保存され、いつでも変更できます。",
+    "拒否はこのブラウジングセッション中のみ有効です。分析の許可はこのブラウザーに保存され、選択はいつでも変更できます。",
   privacyCollectTitle: "分析を許可した場合",
   privacyCollectCopy:
-    "Google Analytics の設定後、Twain はプレイの節目、クリア時間と各ステージの時間、ヒント、ミス、連続記録、画面設定、および Google Analytics が収集する基本的な端末・ブラウザー・おおよその位置情報を送信します。",
-  privacyAvoidTitle: "Twain が送信しない情報",
+    "Google Analytics を有効にすると、Twain はプレイの節目、クリア時間と各ステージの時間、ヒント、ミス、連続記録、画面設定を送信します。Enhanced Measurement はページビューに加え、該当する場合はスクロールの深さ、外部リンクのクリック、サイト内検索、動画の操作、ファイルのダウンロード、フォーム操作も記録します。また Google Analytics にはページやリンクのメタデータ、Cookie ベースの仮名識別子、基本的な端末・ブラウザー・おおよその位置情報が送信されます。",
+  privacyAvoidTitle: "カスタムゲームイベントの範囲",
   privacyAvoidCopy:
-    "パズルの経路、個々の操作、パズル seed、氏名、メールアドレス、アカウント ID、自由入力テキストは送信しません。",
+    "Twain のカスタムゲームイベントには、パズルの経路、個々の手、パズル seed、手掛かりの値、氏名、メールアドレス、アカウント ID、自由入力テキストは含まれません。該当する場合、Enhanced Measurement は上記のページおよび操作のメタデータを送信することがあります。",
   privacyStatusGranted: "現在の選択：分析を許可。",
   privacyStatusDenied: "現在の選択：分析を拒否。",
   privacyStatusUnset: "現在の選択：未選択。",
@@ -620,13 +622,13 @@ const KOREAN = {
   privacyDialogTitle: "개인정보 및 분석",
   closePrivacy: "개인정보 설정 닫기",
   privacyDialogIntro:
-    "선택 사항은 이 브라우저에만 저장되며 언제든지 변경할 수 있습니다.",
+    "거부는 현재 브라우징 세션에만 적용됩니다. 분석 허용은 이 브라우저에 저장되며 언제든지 선택을 변경할 수 있습니다.",
   privacyCollectTitle: "분석을 허용하는 경우",
   privacyCollectCopy:
-    "Google Analytics가 설정되면 Twain은 게임 진행 단계, 완료 및 스테이지 시간, 힌트, 실수, 연속 기록, 화면 설정과 Google Analytics가 수집하는 기본 기기·브라우저·대략적 위치 정보를 전송합니다.",
-  privacyAvoidTitle: "Twain이 전송하지 않는 정보",
+    "Google Analytics를 사용하면 Twain은 게임 진행 단계, 완료 및 스테이지 시간, 힌트, 실수, 연속 기록, 화면 설정을 전송합니다. Enhanced Measurement는 페이지 조회와 해당하는 경우 스크롤 깊이, 외부 링크 클릭, 사이트 검색, 동영상 참여, 파일 다운로드, 양식 상호작용도 기록합니다. Google Analytics에는 페이지·링크 메타데이터, 쿠키 기반 가명 식별자, 기본 기기·브라우저·대략적 위치 정보도 전송됩니다.",
+  privacyAvoidTitle: "맞춤 게임 이벤트 범위",
   privacyAvoidCopy:
-    "퍼즐 경로, 개별 동작, 퍼즐 seed, 이름, 이메일 주소, 계정 ID, 자유 입력 텍스트는 전송하지 않습니다.",
+    "Twain의 맞춤 게임 이벤트에는 퍼즐 경로, 개별 이동, 퍼즐 seed, 단서 값, 이름, 이메일 주소, 계정 ID, 자유 입력 텍스트가 포함되지 않습니다. 해당하는 경우 Enhanced Measurement는 위에 설명된 페이지 및 상호작용 메타데이터를 전송할 수 있습니다.",
   privacyStatusGranted: "현재 선택: 분석 허용.",
   privacyStatusDenied: "현재 선택: 분석 거부.",
   privacyStatusUnset: "현재 선택: 선택하지 않음.",
@@ -757,13 +759,13 @@ const SPANISH = {
   privacyDialogTitle: "Privacidad y analítica",
   closePrivacy: "Cerrar opciones de privacidad",
   privacyDialogIntro:
-    "Tu elección se guarda solo en este navegador y puedes cambiarla en cualquier momento.",
+    "Rechazar se aplica solo a esta sesión de navegación; permitir la analítica se guarda en este navegador. Puedes cambiar tu elección en cualquier momento.",
   privacyCollectTitle: "Si permites la analítica",
   privacyCollectCopy:
-    "Cuando Google Analytics esté configurado, Twain enviará hitos de juego, tiempos total y por nivel, pistas, errores, rachas, ajustes de interfaz y datos básicos de dispositivo, navegador y ubicación aproximada recopilados por Google Analytics.",
-  privacyAvoidTitle: "Lo que Twain no envía",
+    "Al activar Google Analytics, Twain envía hitos de juego, tiempos total y por nivel, pistas, errores, rachas y ajustes de interfaz. Enhanced Measurement también registra páginas vistas y, cuando corresponde, profundidad de desplazamiento, clics en enlaces externos, búsquedas internas, interacción con vídeos, descargas de archivos y formularios. Google Analytics también recibe metadatos de páginas y enlaces, identificadores seudónimos basados en cookies y datos básicos del dispositivo, navegador y ubicación aproximada.",
+  privacyAvoidTitle: "Límites de los eventos de juego",
   privacyAvoidCopy:
-    "No se envían recorridos del puzle, movimientos individuales, seeds del puzle, nombres, correos electrónicos, IDs de cuenta ni texto libre.",
+    "Los eventos de juego personalizados de Twain excluyen recorridos del puzle, movimientos individuales, seeds, valores de pistas, nombres, correos electrónicos, identificadores de cuenta y texto libre. Cuando corresponde, Enhanced Measurement puede enviar los metadatos de páginas e interacciones descritos arriba.",
   privacyStatusGranted: "Elección actual: analítica permitida.",
   privacyStatusDenied: "Elección actual: analítica rechazada.",
   privacyStatusUnset: "Elección actual: sin seleccionar.",
@@ -894,13 +896,13 @@ const BRAZILIAN_PORTUGUESE = {
   privacyDialogTitle: "Privacidade e análise",
   closePrivacy: "Fechar opções de privacidade",
   privacyDialogIntro:
-    "Sua escolha fica salva apenas neste navegador e pode ser alterada a qualquer momento.",
+    "A recusa vale apenas para esta sessão de navegação; a permissão de análise fica salva neste navegador. Você pode alterar sua escolha a qualquer momento.",
   privacyCollectTitle: "Se você permitir a análise",
   privacyCollectCopy:
-    "Quando o Google Analytics estiver configurado, o Twain enviará marcos do jogo, tempos total e por fase, dicas, erros, sequências, configurações da interface e dados básicos de dispositivo, navegador e localização aproximada coletados pelo Google Analytics.",
-  privacyAvoidTitle: "O que o Twain não envia",
+    "Ao ativar o Google Analytics, o Twain envia marcos do jogo, tempos total e por fase, dicas, erros, sequências e configurações da interface. O Enhanced Measurement também registra visualizações de página e, quando aplicável, profundidade de rolagem, cliques em links externos, pesquisas internas, interação com vídeos, downloads de arquivos e formulários. O Google Analytics também recebe metadados de páginas e links, identificadores pseudônimos baseados em cookies e dados básicos do dispositivo, navegador e localização aproximada.",
+  privacyAvoidTitle: "Limites dos eventos de jogo",
   privacyAvoidCopy:
-    "Não são enviados caminhos do quebra-cabeça, movimentos individuais, seeds do quebra-cabeça, nomes, endereços de e-mail, IDs de conta nem texto livre.",
+    "Os eventos de jogo personalizados do Twain excluem caminhos do quebra-cabeça, movimentos individuais, seeds, valores das pistas, nomes, e-mails, IDs de conta e texto livre. Quando aplicável, o Enhanced Measurement pode enviar os metadados de páginas e interações descritos acima.",
   privacyStatusGranted: "Escolha atual: análise permitida.",
   privacyStatusDenied: "Escolha atual: análise recusada.",
   privacyStatusUnset: "Escolha atual: não selecionada.",

@@ -524,6 +524,7 @@ function openPrivacyDialog(source = document.activeElement) {
     howToDialog.close();
   }
   privacyDialog.showModal();
+  closePrivacyButton.focus();
 }
 
 function closePrivacyDialog() {
