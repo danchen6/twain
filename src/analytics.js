@@ -234,7 +234,9 @@ export function createAnalyticsClient(config = ANALYTICS_CONFIG) {
     windowObject.dataLayer = Array.isArray(windowObject.dataLayer)
       ? windowObject.dataLayer
       : [];
-    gtag = (...args) => windowObject.dataLayer.push(args);
+    gtag = function queueGoogleTagCommand() {
+      windowObject.dataLayer.push(arguments);
+    };
     windowObject.gtag = gtag;
 
     gtag("consent", "default", {

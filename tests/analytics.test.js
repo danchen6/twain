@@ -63,6 +63,12 @@ function fakeEnvironment({
   };
 }
 
+function assertGoogleTagCommand(command, expected) {
+  assert.equal(Array.isArray(command), false);
+  assert.equal(Object.prototype.toString.call(command), "[object Arguments]");
+  assert.deepEqual(Array.from(command), expected);
+}
+
 test("analytics stays network-silent without all configuration gates", () => {
   for (const [config, consent] of [
     [{ enabled: false, measurementId: "G-ABC123" }, {}],
@@ -223,7 +229,7 @@ test("analytics consent records are versioned, timestamped, and validated", () =
   );
 });
 
-test("analytics initializes one privacy-limited Google tag and queues events", () => {
+test("analytics initializes one privacy-limited Google tag and queues compatible commands", () => {
   const environment = fakeEnvironment();
   const client = createAnalyticsClient({
     enabled: true,
@@ -240,7 +246,7 @@ test("analytics initializes one privacy-limited Google tag and queues events", (
     id: "twain-google-tag",
     src: "https://www.googletagmanager.com/gtag/js?id=G-ABC123",
   });
-  assert.deepEqual(environment.windowObject.dataLayer[0], [
+  assertGoogleTagCommand(environment.windowObject.dataLayer[0], [
     "consent",
     "default",
     {
@@ -250,8 +256,12 @@ test("analytics initializes one privacy-limited Google tag and queues events", (
       ad_personalization: "denied",
     },
   ]);
-  assert.equal(environment.windowObject.dataLayer[1][0], "js");
-  assert.deepEqual(environment.windowObject.dataLayer[2], [
+  assertGoogleTagCommand(environment.windowObject.dataLayer[1], [
+    "js",
+    environment.windowObject.dataLayer[1][1],
+  ]);
+  assert.equal(environment.windowObject.dataLayer[1][1] instanceof Date, true);
+  assertGoogleTagCommand(environment.windowObject.dataLayer[2], [
     "config",
     "G-ABC123",
     {
@@ -261,13 +271,13 @@ test("analytics initializes one privacy-limited Google tag and queues events", (
       debug_mode: true,
     },
   ]);
-  assert.deepEqual(environment.windowObject.dataLayer[3], [
+  assertGoogleTagCommand(environment.windowObject.dataLayer[3], [
     "event",
     "daily_run_complete",
     { streak_days: 4 },
   ]);
   assert.equal(client.revoke(), true);
-  assert.deepEqual(environment.windowObject.dataLayer.at(-1), [
+  assertGoogleTagCommand(environment.windowObject.dataLayer.at(-1), [
     "consent",
     "update",
     {
@@ -303,7 +313,7 @@ test("analytics enforces GA-compatible IDs, event names, and scalar parameters",
     }),
     true,
   );
-  assert.deepEqual(environment.windowObject.dataLayer.at(-1), [
+  assertGoogleTagCommand(environment.windowObject.dataLayer.at(-1), [
     "event",
     "hint_used",
     {
