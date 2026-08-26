@@ -102,6 +102,9 @@ export function createDailyPlay(dateKey, puzzle, stageIndex = 0) {
     history: [],
     hints: 0,
     mistakes: 0,
+    stageElapsedBaselineMs: 0,
+    stageHintsBaseline: 0,
+    stageMistakesBaseline: 0,
     stageCompleted: false,
     dailyComplete: false,
   };
@@ -114,6 +117,22 @@ export function restoreDailyPlay(candidate, dateKey, puzzle) {
 
   const schedule = dailySchedule(dateKey);
   const expectedDifficulty = dailyDifficultyAt(dateKey, candidate.stageIndex);
+  const baselineValues = [
+    candidate.stageElapsedBaselineMs,
+    candidate.stageHintsBaseline,
+    candidate.stageMistakesBaseline,
+  ];
+  const hasUnknownBaselines = baselineValues.every(
+    (value) => value === null || value === undefined,
+  );
+  const hasValidBaselines =
+    Number.isFinite(candidate.stageElapsedBaselineMs) &&
+    candidate.stageElapsedBaselineMs >= 0 &&
+    candidate.stageElapsedBaselineMs <= candidate.elapsedMs &&
+    isNonnegativeInteger(candidate.stageHintsBaseline) &&
+    candidate.stageHintsBaseline <= candidate.hints &&
+    isNonnegativeInteger(candidate.stageMistakesBaseline) &&
+    candidate.stageMistakesBaseline <= candidate.mistakes;
 
   if (
     puzzle.difficulty !== expectedDifficulty ||
@@ -122,6 +141,7 @@ export function restoreDailyPlay(candidate, dateKey, puzzle) {
     candidate.elapsedMs < 0 ||
     !isNonnegativeInteger(candidate.hints) ||
     !isNonnegativeInteger(candidate.mistakes) ||
+    (!hasUnknownBaselines && !hasValidBaselines) ||
     !Array.isArray(candidate.history) ||
     candidate.history.length > MAX_STORED_HISTORY ||
     !puzzle.lines.some(({ id }) => id === candidate.activeLineId)
@@ -159,6 +179,15 @@ export function restoreDailyPlay(candidate, dateKey, puzzle) {
     history,
     hints: candidate.hints,
     mistakes: candidate.mistakes,
+    stageElapsedBaselineMs: hasValidBaselines
+      ? Math.floor(candidate.stageElapsedBaselineMs)
+      : null,
+    stageHintsBaseline: hasValidBaselines
+      ? candidate.stageHintsBaseline
+      : null,
+    stageMistakesBaseline: hasValidBaselines
+      ? candidate.stageMistakesBaseline
+      : null,
     stageCompleted,
     dailyComplete:
       stageCompleted && candidate.stageIndex === schedule.length - 1,
@@ -184,5 +213,8 @@ export function createDailyStorageRecord(play, elapsedMs = play.elapsedMs) {
       ),
     hints: play.hints,
     mistakes: play.mistakes,
+    stageElapsedBaselineMs: play.stageElapsedBaselineMs,
+    stageHintsBaseline: play.stageHintsBaseline,
+    stageMistakesBaseline: play.stageMistakesBaseline,
   };
 }

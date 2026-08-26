@@ -31,6 +31,7 @@ Do not load every journal by default. Episodic memory is evidence and history, n
 | [puzzle-model.md](puzzle-model.md) | Puzzle schema, keys, compatibility, and executable invariants |
 | [generation.md](generation.md) | Construction algorithm, determinism, difficulty profiles, and generator limitations |
 | [interaction.md](interaction.md) | Session state, move semantics, input mapping, hints, timer, and rendering layers |
+| [analytics.md](analytics.md) | Consent behavior, streak semantics, GA event schema, rollout, data boundaries, and analysis guidance |
 | [quality.md](quality.md) | Automated checks, visual QA, release gate, and known verification gaps |
 
 Keep semantic documents small and single-purpose. Add a new topic only when new knowledge has no existing owner, then update this index in the same change.

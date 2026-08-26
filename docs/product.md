@@ -10,7 +10,7 @@ Provide one original three-to-five-stage puzzle run per Taiwan calendar date. A 
 
 ## Release status
 
-Twain is an MIT-licensed public preview. The preview asserts the documented puzzle invariants and release gates, but it does not claim broad human difficulty calibration, full physical-device coverage, or stable-release readiness. Focused external contributions may be accepted; the roadmap and maintenance do not depend on them.
+Twain is an MIT-licensed public preview. The preview asserts the documented puzzle invariants and release gates, but it does not claim broad human difficulty calibration, full physical-device coverage, professional linguistic review of every locale, or stable-release readiness. Focused external contributions may be accepted; the roadmap and maintenance do not depend on them.
 
 ## Rules
 
@@ -34,19 +34,45 @@ Moving from a line's tail to its immediate predecessor backtracks exactly one ce
 - One elapsed timer spans the selected stages. It pauses after a stage, resumes on the first valid move or Hint in the next stage, and stops after the final selected level.
 - Clear removes only the current board's paths and Undo history. It never resets elapsed daily time or completed stages.
 - The current stage, paths, active line, Undo history, hint/mistake counts, and elapsed time persist in localStorage. Reload restores them paused until the next valid move or Hint. Persistence is browser-local, not cross-device.
+- Completing every selected stage records one browser-local daily streak day. Same-day restores are idempotent, consecutive Taiwan dates extend the streak, and a missed date resets the current streak without erasing the longest streak or total completed days. Streak has no visible UI yet.
 - Reloading, returning to a visible tab, or reaching zero on the finished-run countdown after the Taiwan date changes starts the new daily run.
 - Header Share always opens an in-app dialog with a locally generated QR code and the copyable canonical page URL; it does not invoke the platform share sheet. Copy uses the Clipboard API when available, a local compatibility copy otherwise, and leaves the visible URL selected for manual copying if both are blocked. The date-to-seed rule, rather than query parameters, makes the linked board set reproducible.
-- Final completion remains visible after reload with the finished time, cumulative Hint count, a live countdown to the next Taiwan day, and a Share action whose result copy includes the public Twain number, finished time, grammatically formatted Hint count, challenge sentence, and canonical URL.
+- Final completion remains visible after reload with the finished time, cumulative Hint count, a live countdown to the next Taiwan day, and a Share action whose localized result copy includes the public Twain number, finished time, grammatically formatted Hint count, challenge sentence, and canonical URL.
+
+## Language and locale
+
+- The complete interface is available in Traditional Chinese (`繁體中文`, `zh-TW`), English (`en`), Simplified Chinese (`zh-CN`), Japanese (`ja`), Korean (`ko`), Spanish (`es`), and Brazilian Portuguese (`pt-BR`). This includes visible copy, dates, metadata, dialogs, move feedback, progress/completion states, sharing text, and accessibility labels.
+- With no override, Twain selects the first supported match from the browser's locale preferences and falls back to English. Chinese script and region subtags distinguish Traditional from Simplified Chinese; Portuguese variants use the available Brazilian Portuguese localization.
+- The rightmost header globe opens a language menu. Choosing a language persists a browser-local override; choosing **Automatic** removes it and returns to browser detection.
+- **Twain**, numeric/alphabetic clue glyphs, puzzle rules, Taiwan date boundaries, public numbering, daily schedules, and stage seeds are locale-independent. Changing language updates presentation only and never changes or resets play state.
+
+## Privacy and measurement
+
+- Optional Google Analytics is present as a disabled integration mechanism; no Measurement ID is configured. The Google tag is never loaded unless a valid ID is deliberately enabled and the current browser has explicitly allowed analytics.
+- With no saved choice, a localized bottom banner presents direct **Decline**, **Allow analytics**, and **Privacy details** actions. Help → **Privacy choices** lets the player review and change the choice later. Declining keeps the page tag-free; revoking after activation reloads into that tag-free state.
+- The browser-local consent record contains only the decision, schema version, and decision time. It is not an account-level or centrally auditable record and disappears with cleared site data.
+- Consented analytics is outcome-level: daily/stage starts and completions, elapsed time, Hint/mistake totals, streak totals, interface locale, display mode, and bounded board context. Paths, individual moves, seeds, names, email, account IDs, and free text are excluded.
+- Functional localStorage for play, language, streak, and the consent choice remains available when optional analytics is declined. The complete contract and rollout checklist live in [analytics.md](analytics.md).
+
+## Discovery and Home Screen
+
+- The static document publishes a canonical production URL plus complete Open Graph image metadata and a matching `summary_large_image` card. Social crawlers receive stable English identity copy because the one canonical URL does not encode a locale.
+- The versioned 1200×630 social image uses a real near-complete Twain state: both witness paths stop one cell before their final clues. Its deterministic capture date predates the numbered public run, so it shows the core two-line interaction without spoiling a playable daily board, displaying a completion result, or becoming stale on the next Taiwan day.
+- iOS receives a dedicated opaque 180×180 `apple-touch-icon`. The Web App Manifest adds opaque 192×192 and 512×512 full-bleed icons, a short **Twain** launch name, project-relative start/scope URLs, and standalone display.
+- Home Screen installation changes presentation only. Twain still has no Service Worker or offline/update contract; a standalone launch remains the same network-served static game and browser-local progress model.
 
 ## Current scope
 
 - Pointer/touch drawing, tap-to-step, clue/path-driven line selection, keyboard arrows plus `N`/`L`, cell-by-cell backtracking, body-collision rejection, global Undo, Clear, and Hint.
 - Curated high-contrast route gradients selected deterministically from each stage seed.
 - Header Help opens the compact rule tutorial as a native modal. Header Share opens a separate QR/link modal; final-result Share retains the platform menu plus copy/manual fallbacks.
+- The rightmost header Language action exposes Automatic plus all seven locale autonyms without leaving the play surface.
+- A localized privacy banner and modal consent manager gate the disabled-by-default analytics adapter; Help provides the persistent re-entry point.
+- Shared links expose a rich social card, and supported browsers can add Twain to the Home Screen with dedicated branding and standalone launch chrome.
 - Mobile play suppresses accidental double-tap zoom and long-press selection while preserving pinch zoom away from the board.
-- Responsive static Web UI hosted without a build, package install, CDN, external QR service, or runtime service.
+- Responsive static Web UI hosted without a build, package install, CDN, external QR service, or application runtime service. A future explicitly enabled and consented GA tag is the only optional third-party runtime request.
 
-The game remains single-player. Accounts, cross-device sync, historical-date selection, custom seeds, a puzzle archive, streaks, leaderboards, and social collaboration are not current scope.
+The game remains single-player. Accounts, cross-device sync, historical-date selection, custom seeds, a puzzle archive, visible streak/history UI, leaderboards, and social collaboration are not current scope.
 
 ## Visual contract
 

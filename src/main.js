@@ -1,4 +1,5 @@
 import {
+  DAILY_RUN_VERSION,
   DAILY_STORAGE_KEY,
   dailyDifficultyAt,
   dailyStageSeed,
@@ -12,6 +13,11 @@ import {
   restoreDailyPlay,
   storedDailyStageIndex,
 } from "./daily-state.js";
+import {
+  analytics,
+  readAnalyticsConsent,
+  writeAnalyticsConsent,
+} from "./analytics.js";
 import {
   DIFFICULTY_PROFILES,
   cellKey,
@@ -27,22 +33,46 @@ import {
   clueDisplayValue,
   hintPaths,
   isLineComplete,
-  lineDisplayName,
   lineIdAtTarget,
   nextExpectedClue,
   snapshotPlayState,
   totalPathLength,
   undoPlayState,
 } from "./game.js";
+import {
+  LOCALE_STORAGE_KEY,
+  SUPPORTED_LOCALES,
+  formatLocalizedDate,
+  isSupportedLocale,
+  localeLabel,
+  matchBrowserLocale,
+  translate,
+} from "./i18n.js";
 import { routePaletteForSeed } from "./palette.js";
 import { createQrCode } from "./qr.js";
 import {
   formatDailyResultShareText,
   formatHintCount,
 } from "./share.js";
+import {
+  STREAK_STORAGE_KEY,
+  activeStreakForDate,
+  createStreakRecord,
+  recordDailyCompletion,
+  restoreStreakRecord,
+} from "./streak.js";
+import {
+  dailyRunCompleteEvent,
+  dailyRunStartEvent,
+  hintUsedEvent,
+  levelEndEvent,
+  levelStartEvent,
+} from "./telemetry.js";
 
+const metaDescription = document.querySelector("#metaDescription");
+const homeLink = document.querySelector("#homeLink");
 const boardElement = document.querySelector("#board");
-const gameCard = document.querySelector(".game-card");
+const gameCard = document.querySelector("#gameCard");
 const dailyTimer = document.querySelector("#dailyTimer");
 const timerValue = document.querySelector("#timerValue");
 const dailyProgress = document.querySelector("#dailyProgress");
@@ -59,10 +89,27 @@ const completionStats = document.querySelector("#completionStats");
 const completionCountdown = document.querySelector("#completionCountdown");
 const continueButton = document.querySelector("#continueButton");
 const shareResultButton = document.querySelector("#shareResultButton");
+const shareResultLabel = document.querySelector("#shareResultLabel");
+const undoLabel = document.querySelector("#undoLabel");
+const hintLabel = document.querySelector("#hintLabel");
 const helpButton = document.querySelector("#helpButton");
 const shareButton = document.querySelector("#shareButton");
+const languageButton = document.querySelector("#languageButton");
+const languageMenu = document.querySelector("#languageMenu");
+const languageMenuTitle = document.querySelector("#languageMenuTitle");
+const languageOptions = document.querySelector("#languageOptions");
 const howToDialog = document.querySelector("#howToDialog");
 const closeHowToButton = document.querySelector("#closeHowToButton");
+const howToTitle = document.querySelector("#howToTitle");
+const firstRuleTitle = document.querySelector("#firstRuleTitle");
+const firstRuleCopy = document.querySelector("#firstRuleCopy");
+const secondRuleTitle = document.querySelector("#secondRuleTitle");
+const secondRuleCopy = document.querySelector("#secondRuleCopy");
+const keyboardInstructions = document.querySelector("#keyboardInstructions");
+const privacyPreferencesButton = document.querySelector(
+  "#privacyPreferencesButton",
+);
+const boardInstructions = document.querySelector("#boardInstructions");
 const headerShareDialog = document.querySelector("#headerShareDialog");
 const headerShareTitle = document.querySelector("#headerShareTitle");
 const headerShareInstructions = document.querySelector(
@@ -70,6 +117,7 @@ const headerShareInstructions = document.querySelector(
 );
 const headerShareQr = document.querySelector("#headerShareQr");
 const headerShareUrl = document.querySelector("#headerShareUrl");
+const headerShareUrlLabel = document.querySelector("#headerShareUrlLabel");
 const copyHeaderShareButton = document.querySelector(
   "#copyHeaderShareButton",
 );
@@ -77,6 +125,7 @@ const closeHeaderShareButton = document.querySelector(
   "#closeHeaderShareButton",
 );
 const shareFallbackDialog = document.querySelector("#shareFallbackDialog");
+const shareFallbackTitle = document.querySelector("#shareFallbackTitle");
 const shareFallbackInstructions = document.querySelector(
   "#shareFallbackInstructions",
 );
@@ -87,6 +136,23 @@ const copyShareFallbackButton = document.querySelector(
 const closeShareFallbackButton = document.querySelector(
   "#closeShareFallbackButton",
 );
+const privacyDialog = document.querySelector("#privacyDialog");
+const privacyDialogTitle = document.querySelector("#privacyDialogTitle");
+const closePrivacyButton = document.querySelector("#closePrivacyButton");
+const privacyDialogIntro = document.querySelector("#privacyDialogIntro");
+const privacyCollectTitle = document.querySelector("#privacyCollectTitle");
+const privacyCollectCopy = document.querySelector("#privacyCollectCopy");
+const privacyAvoidTitle = document.querySelector("#privacyAvoidTitle");
+const privacyAvoidCopy = document.querySelector("#privacyAvoidCopy");
+const privacyStatus = document.querySelector("#privacyStatus");
+const privacyDeclineButton = document.querySelector("#privacyDeclineButton");
+const privacyAcceptButton = document.querySelector("#privacyAcceptButton");
+const privacyBanner = document.querySelector("#privacyBanner");
+const privacyBannerTitle = document.querySelector("#privacyBannerTitle");
+const privacyBannerCopy = document.querySelector("#privacyBannerCopy");
+const privacyDetailsButton = document.querySelector("#privacyDetailsButton");
+const bannerDeclineButton = document.querySelector("#bannerDeclineButton");
+const bannerAcceptButton = document.querySelector("#bannerAcceptButton");
 const shareFeedback = document.querySelector("#shareFeedback");
 
 const MAX_HISTORY = 256;
@@ -109,7 +175,248 @@ let activePointerId = null;
 let lastPointerCell = null;
 let shareFeedbackHandle = null;
 let headerShareCopyResetHandle = null;
-let shareFallbackCopiedMessage = "Twain share text copied.";
+let shareFallbackCopiedMessage = "";
+let privacyDialogReturnFocus = null;
+let analyticsConsentRecord = readAnalyticsConsent();
+let streakRecord = readStoredStreak();
+
+const DIFFICULTY_TRANSLATION_KEYS = Object.freeze({
+  easy: "difficultyEasy",
+  medium: "difficultyMedium",
+  hard: "difficultyHard",
+  extra: "difficultyExtra",
+  ultra: "difficultyUltra",
+});
+
+function browserLocalePreferences() {
+  const preferences = [];
+
+  try {
+    preferences.push(...Array.from(navigator.languages ?? []));
+  } catch {
+    // Some embedded browsers expose a non-iterable languages value.
+  }
+
+  if (typeof navigator.language === "string") {
+    preferences.push(navigator.language);
+  }
+
+  return preferences;
+}
+
+function readLocaleOverride() {
+  try {
+    const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+    if (isSupportedLocale(stored)) {
+      return stored;
+    }
+
+    if (stored !== null) {
+      window.localStorage.removeItem(LOCALE_STORAGE_KEY);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+const automaticLocale = matchBrowserLocale(browserLocalePreferences());
+let localeOverride = readLocaleOverride();
+let activeLocale = localeOverride ?? automaticLocale;
+
+function t(key, params = {}) {
+  return translate(activeLocale, key, params);
+}
+
+function lineName(lineId) {
+  return t(lineId === "a" ? "lineNumber" : "lineLetter");
+}
+
+function difficultyName(difficulty) {
+  const key = DIFFICULTY_TRANSLATION_KEYS[difficulty];
+  return key
+    ? t(key)
+    : (DIFFICULTY_PROFILES[difficulty]?.label ?? difficulty);
+}
+
+function currentHeaderShareTitle() {
+  const dateKey = session?.dateKey ?? taiwanDateKey();
+  const twainNumber = dailyTwainNumber(dateKey);
+  return twainNumber === null
+    ? t("shareTitle")
+    : t("shareTitleNumbered", { number: twainNumber });
+}
+
+function applyStaticTranslations() {
+  document.documentElement.lang = activeLocale;
+  document.title = t("metaTitle");
+  metaDescription.content = t("metaDescription");
+  homeLink.setAttribute("aria-label", t("homeLabel"));
+  helpButton.setAttribute("aria-label", t("helpButtonLabel"));
+  shareButton.setAttribute("aria-label", t("shareButtonLabel"));
+  languageButton.setAttribute("aria-label", t("languageButtonLabel"));
+  gameCard.setAttribute("aria-label", t("gameLabel"));
+  dailyProgress.setAttribute("aria-label", t("progressLabel"));
+  clearButton.textContent = t("clear");
+  boardElement.setAttribute("aria-label", t("boardLabel"));
+  shareResultLabel.textContent = t("shareAction");
+  undoLabel.textContent = t("undo");
+  hintLabel.textContent = t("hint");
+  boardInstructions.textContent = t("boardInstructions");
+
+  howToTitle.textContent = t("howToTitle");
+  closeHowToButton.setAttribute("aria-label", t("closeHowTo"));
+  firstRuleTitle.textContent = t("guideTitle");
+  firstRuleCopy.textContent = t("guideCopy");
+  secondRuleTitle.textContent = t("fillTitle");
+  secondRuleCopy.textContent = t("fillCopy");
+  keyboardInstructions.innerHTML = t("keyboardHtml");
+  privacyPreferencesButton.textContent = t("privacyPreferences");
+
+  privacyDialogTitle.textContent = t("privacyDialogTitle");
+  closePrivacyButton.setAttribute("aria-label", t("closePrivacy"));
+  privacyDialogIntro.textContent = t("privacyDialogIntro");
+  privacyCollectTitle.textContent = t("privacyCollectTitle");
+  privacyCollectCopy.textContent = t("privacyCollectCopy");
+  privacyAvoidTitle.textContent = t("privacyAvoidTitle");
+  privacyAvoidCopy.textContent = t("privacyAvoidCopy");
+  privacyDeclineButton.textContent = t("privacyDecline");
+  privacyAcceptButton.textContent = t("privacyAccept");
+
+  privacyBannerTitle.textContent = t("privacyBannerTitle");
+  privacyBannerCopy.textContent = t("privacyBannerCopy");
+  privacyDetailsButton.textContent = t("privacyDetails");
+  bannerDeclineButton.textContent = t("privacyDecline");
+  bannerAcceptButton.textContent = t("privacyAccept");
+
+  headerShareTitle.textContent = currentHeaderShareTitle();
+  closeHeaderShareButton.setAttribute("aria-label", t("closeShare"));
+  headerShareInstructions.textContent = t("shareInstructions");
+  headerShareQr.setAttribute("aria-label", t("qrLabel"));
+  headerShareUrlLabel.textContent = t("linkLabel");
+  copyHeaderShareButton.textContent = t("copyLink");
+
+  shareFallbackTitle.textContent = t("shareFallbackTitle");
+  closeShareFallbackButton.setAttribute(
+    "aria-label",
+    t("closeShareFallback"),
+  );
+  shareFallbackInstructions.textContent = t("shareFallbackInstructions");
+  copyShareFallbackButton.textContent = t("copy");
+  continueButton.textContent = t("nextLevel");
+  languageMenuTitle.textContent = t("languageTitle");
+}
+
+function createLanguageOption({ value, label, checked, automatic = false }) {
+  const option = document.createElement("button");
+  const check = document.createElement("span");
+  const copy = document.createElement("span");
+
+  option.type = "button";
+  option.className = `language-option${automatic ? " is-automatic" : ""}`;
+  option.dataset.locale = value;
+  option.setAttribute("role", "menuitemradio");
+  option.setAttribute("aria-checked", String(checked));
+  option.lang = automatic ? activeLocale : value;
+  check.className = "language-option-check";
+  check.textContent = "✓";
+  check.setAttribute("aria-hidden", "true");
+  copy.textContent = label;
+  option.append(check, copy);
+  return option;
+}
+
+function renderLanguageOptions() {
+  const options = [
+    createLanguageOption({
+      value: "auto",
+      label: t("languageAutomatic", {
+        language: localeLabel(automaticLocale),
+      }),
+      checked: localeOverride === null,
+      automatic: true,
+    }),
+    ...SUPPORTED_LOCALES.map(({ code, label }) =>
+      createLanguageOption({
+        value: code,
+        label,
+        checked: localeOverride === code,
+      }),
+    ),
+  ];
+  languageOptions.replaceChildren(...options);
+}
+
+function applyLocale() {
+  applyStaticTranslations();
+  renderLanguageOptions();
+  renderPrivacyNotice();
+
+  if (!session) {
+    return;
+  }
+
+  updateDailyDate();
+  renderPuzzle();
+  renderState();
+}
+
+function persistLocaleOverride() {
+  try {
+    if (localeOverride === null) {
+      window.localStorage.removeItem(LOCALE_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(LOCALE_STORAGE_KEY, localeOverride);
+    }
+  } catch {
+    // The in-memory choice still applies when storage is unavailable.
+  }
+}
+
+function languageOptionElements() {
+  return [...languageOptions.querySelectorAll(".language-option")];
+}
+
+function openLanguageMenu(focusTarget = "checked") {
+  languageMenu.hidden = false;
+  languageButton.setAttribute("aria-expanded", "true");
+  const options = languageOptionElements();
+  const target =
+    focusTarget === "first"
+      ? options[0]
+      : focusTarget === "last"
+        ? options.at(-1)
+        : options.find((option) => option.getAttribute("aria-checked") === "true");
+  window.requestAnimationFrame(() => target?.focus({ preventScroll: true }));
+}
+
+function closeLanguageMenu({ restoreFocus = false } = {}) {
+  if (languageMenu.hidden) {
+    return;
+  }
+
+  languageMenu.hidden = true;
+  languageButton.setAttribute("aria-expanded", "false");
+  if (restoreFocus) {
+    languageButton.focus({ preventScroll: true });
+  }
+}
+
+function chooseLocale(value) {
+  localeOverride = value === "auto" ? null : value;
+
+  if (localeOverride !== null && !isSupportedLocale(localeOverride)) {
+    return;
+  }
+
+  activeLocale = localeOverride ?? automaticLocale;
+  persistLocaleOverride();
+  applyLocale();
+  closeLanguageMenu({ restoreFocus: true });
+  liveAnnouncer.textContent = t("languageChanged", {
+    language: localeLabel(activeLocale),
+  });
+}
 
 function formatElapsed(milliseconds) {
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
@@ -128,25 +435,18 @@ function formatCountdown(milliseconds) {
     .join(":");
 }
 
-function formatDailyDate(dateKey) {
-  const date = new Date(`${dateKey}T00:00:00.000Z`);
-  const label = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(date);
-  return label;
-}
-
 function formatDailyIdentity(dateKey) {
-  const dateLabel = formatDailyDate(dateKey);
+  const dateLabel = formatLocalizedDate(dateKey, activeLocale);
   const twainNumber = dailyTwainNumber(dateKey);
 
   return {
     accessibleLabel:
       twainNumber === null
-        ? `Today's puzzle date is ${dateLabel}`
-        : `Today's puzzle is Twain number ${twainNumber}, ${dateLabel}`,
+        ? t("dateAria", { date: dateLabel })
+        : t("dateNumberedAria", {
+            date: dateLabel,
+            number: twainNumber,
+          }),
     text: twainNumber === null ? dateLabel : `#${twainNumber} | ${dateLabel}`,
   };
 }
@@ -163,6 +463,95 @@ function canonicalizeLocation() {
 
   if (canonical !== window.location.href) {
     window.history.replaceState({}, "", canonical);
+  }
+}
+
+function readStoredStreak() {
+  try {
+    const stored = window.localStorage.getItem(STREAK_STORAGE_KEY);
+    return (
+      restoreStreakRecord(stored ? JSON.parse(stored) : null) ??
+      createStreakRecord()
+    );
+  } catch {
+    return createStreakRecord();
+  }
+}
+
+function persistStreak() {
+  try {
+    window.localStorage.setItem(
+      STREAK_STORAGE_KEY,
+      JSON.stringify(streakRecord),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function syncCompletedStreak() {
+  if (!session?.dailyComplete) {
+    return streakRecord;
+  }
+
+  const previousLastCompletedDate = streakRecord.lastCompletedDate;
+  streakRecord = recordDailyCompletion(streakRecord, session.dateKey);
+  if (streakRecord.lastCompletedDate !== previousLastCompletedDate) {
+    persistStreak();
+  }
+
+  return streakRecord;
+}
+
+function renderPrivacyNotice() {
+  const state = analyticsConsentRecord?.state ?? null;
+  privacyStatus.textContent = t(
+    state === "granted"
+      ? "privacyStatusGranted"
+      : state === "denied"
+        ? "privacyStatusDenied"
+        : "privacyStatusUnset",
+  );
+  privacyBanner.hidden = state !== null;
+  document.body.classList.toggle("has-privacy-banner", state === null);
+}
+
+function openPrivacyDialog(source = document.activeElement) {
+  privacyDialogReturnFocus =
+    source === privacyPreferencesButton ? helpButton : source;
+  if (howToDialog.open) {
+    howToDialog.close();
+  }
+  privacyDialog.showModal();
+}
+
+function closePrivacyDialog() {
+  if (privacyDialog.open) {
+    privacyDialog.close();
+  }
+}
+
+function saveAnalyticsConsent(state) {
+  const record = writeAnalyticsConsent(state);
+  if (!record) {
+    liveAnnouncer.textContent = t("privacySaveFailed");
+    return;
+  }
+
+  analyticsConsentRecord = record;
+  const wasActive = state === "denied" && analytics.revoke();
+  if (state === "granted") {
+    analytics.initialize();
+  }
+  renderPrivacyNotice();
+  closePrivacyDialog();
+  liveAnnouncer.textContent = t(
+    state === "granted" ? "privacySavedGranted" : "privacySavedDenied",
+  );
+
+  if (wasActive) {
+    window.location.reload();
   }
 }
 
@@ -188,6 +577,65 @@ function currentElapsed() {
   );
 }
 
+function currentDisplayMode() {
+  return window.matchMedia?.("(display-mode: standalone)").matches ||
+    navigator.standalone === true
+    ? "standalone"
+    : "browser";
+}
+
+function telemetryContext() {
+  return {
+    dailyNumber: dailyTwainNumber(session.dateKey),
+    dailyRunVersion: DAILY_RUN_VERSION,
+    displayMode: currentDisplayMode(),
+    locale: activeLocale,
+  };
+}
+
+function trackEvent(definition) {
+  analytics.event(definition.name, definition.parameters);
+}
+
+function stageDelta(total, baseline) {
+  return Number.isFinite(baseline) ? Math.max(0, total - baseline) : null;
+}
+
+function isFreshStage() {
+  return (
+    Number.isFinite(session.stageElapsedBaselineMs) &&
+    currentElapsed() === session.stageElapsedBaselineMs &&
+    session.hints === session.stageHintsBaseline &&
+    totalPathLength(session.paths) === 0
+  );
+}
+
+function trackStageStart() {
+  const context = telemetryContext();
+  const common = {
+    ...context,
+    difficulty: session.puzzle.difficulty,
+    stageCount: session.schedule.length,
+  };
+
+  if (session.stageIndex === 0) {
+    trackEvent(
+      dailyRunStartEvent({
+        ...common,
+        streakDays: activeStreakForDate(streakRecord, session.dateKey),
+      }),
+    );
+  }
+
+  trackEvent(
+    levelStartEvent({
+      ...common,
+      boardCells: session.puzzle.rows * session.puzzle.cols,
+      stageNumber: session.stageIndex + 1,
+    }),
+  );
+}
+
 function persistDailyPlay() {
   if (!session) {
     return;
@@ -204,7 +652,7 @@ function persistDailyPlay() {
 function updateTimer() {
   if (session && taiwanDateKey() !== session.dateKey) {
     initializeDailyRun({
-      message: "A new Taiwan day has begun. Today's first board is ready.",
+      message: t("newDay"),
       tone: "neutral",
     });
     return;
@@ -216,11 +664,16 @@ function updateTimer() {
   dailyTimer.classList.toggle("is-running", Boolean(running));
   dailyTimer.setAttribute(
     "aria-label",
-    `Daily elapsed time, ${running ? "running" : "paused"}, ${formatElapsed(elapsed)}`,
+    t("timerAria", {
+      state: t(running ? "timerRunning" : "timerPaused"),
+      time: formatElapsed(elapsed),
+    }),
   );
 
   if (session?.dailyComplete) {
-    completionCountdown.textContent = `Come back in ${formatCountdown(millisecondsUntilNextTaiwanDay())}`;
+    completionCountdown.textContent = t("countdown", {
+      time: formatCountdown(millisecondsUntilNextTaiwanDay()),
+    });
   }
 }
 
@@ -240,7 +693,11 @@ function startTimer() {
     return;
   }
 
+  const freshStage = isFreshStage();
   session.runningSince = performance.now();
+  if (freshStage) {
+    trackStageStart();
+  }
   updateTimer();
 }
 
@@ -406,14 +863,19 @@ function createHitLayer(puzzle) {
   for (let row = 0; row < puzzle.rows; row += 1) {
     for (let col = 0; col < puzzle.cols; col += 1) {
       const clue = clueByCell.get(cellKey({ row, col }));
-      const clueDescription = clue
-        ? `, ${lineDisplayName(clue.lineId)} clue ${clueDisplayValue(clue.lineId, clue.value)}`
-        : "";
+      const ariaLabel = clue
+        ? t("cellClueAria", {
+            row: row + 1,
+            col: col + 1,
+            line: lineName(clue.lineId),
+            clue: clueDisplayValue(clue.lineId, clue.value),
+          })
+        : t("cellAria", { row: row + 1, col: col + 1 });
       cells.push(`
         <div
           class="cell-hit"
           role="gridcell"
-          aria-label="Row ${row + 1}, column ${col + 1}${clueDescription}"
+          aria-label="${ariaLabel}"
           aria-rowindex="${row + 1}"
           aria-colindex="${col + 1}"
           data-row="${row}"
@@ -443,7 +905,7 @@ function updateDailyDate() {
 
 function renderPuzzle() {
   const { palette, puzzle, schedule, stageIndex } = session;
-  const profile = DIFFICULTY_PROFILES[puzzle.difficulty];
+  const difficulty = difficultyName(puzzle.difficulty);
   gameCard.dataset.routePalette = palette.id;
   document.documentElement.style.setProperty("--route-a-accent", palette.a.accent);
   document.documentElement.style.setProperty("--route-b-accent", palette.b.accent);
@@ -458,28 +920,37 @@ function renderPuzzle() {
   ].join("");
   boardElement.setAttribute(
     "aria-label",
-    `${profile.label} daily Twain puzzle, stage ${stageIndex + 1} of ${schedule.length}, ${puzzle.rows} by ${puzzle.cols}`,
+    t("boardStageAria", {
+      difficulty,
+      stage: stageIndex + 1,
+      total: schedule.length,
+      rows: puzzle.rows,
+      cols: puzzle.cols,
+    }),
   );
 }
 
 function remainingCellCopy(remaining) {
-  return `${remaining} ${remaining === 1 ? "cell" : "cells"} left.`;
+  return t("cellsLeft", { count: remaining });
 }
 
 function defaultStatus() {
   const { puzzle, paths, activeLineId } = session;
-  const profile = DIFFICULTY_PROFILES[puzzle.difficulty];
+  const difficulty = difficultyName(puzzle.difficulty);
 
   if (session.dailyComplete) {
     return {
-      message: `Today's ${session.schedule.length}-board Twain run is complete in ${formatElapsed(currentElapsed())}.`,
+      message: t("statusDailyComplete", {
+        total: session.schedule.length,
+        time: formatElapsed(currentElapsed()),
+      }),
       tone: "success",
     };
   }
 
   if (session.stageCompleted) {
     return {
-      message: `${profile.label} complete. The daily timer is paused until the next stage begins.`,
+      message: t("statusStageComplete", { difficulty }),
       tone: "success",
     };
   }
@@ -491,8 +962,8 @@ function defaultStatus() {
     return {
       message:
         session.stageIndex === 0 && session.elapsedMs === 0
-          ? "Start at 1 or A. The daily timer begins with your first valid move."
-          : `${profile.label} is ready. The daily timer resumes with your first valid move.`,
+          ? t("statusFirstStart")
+          : t("statusReady", { difficulty }),
       tone: "neutral",
     };
   }
@@ -505,17 +976,24 @@ function defaultStatus() {
       (line) => !isLineComplete(puzzle, paths, line.id),
     );
     return {
-      message: `${lineDisplayName(activeLineId)} complete.${
-        nextLine ? ` Continue with ${lineDisplayName(nextLine.id)}.` : ""
-      } ${remainingCellCopy(remaining)}`,
+      message: t("statusLineComplete", {
+        line: lineName(activeLineId),
+        continuation: nextLine
+          ? t("statusContinueLine", { line: lineName(nextLine.id) })
+          : "",
+        cells: remainingCellCopy(remaining),
+      }),
       tone: "neutral",
     };
   }
 
   const nextPart =
     expected <= activeLine.clues.length
-      ? `${lineDisplayName(activeLineId)}: next ${clueDisplayValue(activeLineId, expected)}.`
-      : `${lineDisplayName(activeLineId)} has reached its final clue.`;
+      ? t("statusNextClue", {
+          line: lineName(activeLineId),
+          clue: clueDisplayValue(activeLineId, expected),
+        })
+      : t("statusFinalClue", { line: lineName(activeLineId) });
 
   return {
     message: `${nextPart} ${remainingCellCopy(remaining)}`,
@@ -550,7 +1028,7 @@ function updateRoute(lineId, path) {
 }
 
 function renderDailyProgress() {
-  const profile = DIFFICULTY_PROFILES[session.puzzle.difficulty];
+  const difficulty = difficultyName(session.puzzle.difficulty);
   const totalStages = session.schedule.length;
   const completedStages =
     session.stageIndex + (session.stageCompleted ? 1 : 0);
@@ -560,19 +1038,27 @@ function renderDailyProgress() {
   dailyProgress.setAttribute(
     "aria-valuetext",
     session.dailyComplete
-      ? `All ${totalStages} daily stages complete`
+      ? t("progressAllComplete", { total: totalStages })
       : session.stageCompleted
-        ? `${completedStages} of ${totalStages} stages complete; next level ready`
-      : `${completedStages} complete; ${profile.label}, stage ${session.stageIndex + 1} of ${totalStages}`,
+        ? t("progressNextReady", {
+            completed: completedStages,
+            total: totalStages,
+          })
+        : t("progressCurrent", {
+            completed: completedStages,
+            difficulty,
+            stage: session.stageIndex + 1,
+            total: totalStages,
+          }),
   );
 
-  const scheduleSignature = session.schedule.join(",");
+  const scheduleSignature = `${activeLocale}:${session.schedule.join(",")}`;
 
   if (dailyProgressTrack.dataset.schedule !== scheduleSignature) {
     const steps = session.schedule.map((difficulty, index) => {
       const step = document.createElement("span");
       step.dataset.dailyStep = String(index);
-      step.title = DIFFICULTY_PROFILES[difficulty].label;
+      step.title = difficultyName(difficulty);
       return step;
     });
     dailyProgressTrack.replaceChildren(...steps);
@@ -771,21 +1257,26 @@ function renderCompletion() {
 
   renderCelebration(session.dailyComplete);
 
-  const hintLabel = formatHintCount(session.hints);
+  const hintLabel = formatHintCount(session.hints, activeLocale);
   completionCountdown.hidden = !session.dailyComplete;
   continueButton.hidden = session.dailyComplete;
   shareResultButton.hidden = !session.dailyComplete;
 
   if (session.dailyComplete) {
-    completionTitle.textContent = "Well played!";
-    completionStats.textContent = `Completed in ${formatElapsed(currentElapsed())} · ${hintLabel}`;
-    completionCountdown.textContent = `Come back in ${formatCountdown(millisecondsUntilNextTaiwanDay())}`;
+    completionTitle.textContent = t("completionWell");
+    completionStats.textContent = t("completionStats", {
+      time: formatElapsed(currentElapsed()),
+      hints: hintLabel,
+    });
+    completionCountdown.textContent = t("countdown", {
+      time: formatCountdown(millisecondsUntilNextTaiwanDay()),
+    });
     return;
   }
 
-  completionTitle.textContent = "Nicely done!";
+  completionTitle.textContent = t("completionNice");
   completionStats.textContent = hintLabel;
-  continueButton.textContent = "Next level";
+  continueButton.textContent = t("nextLevel");
 }
 
 function renderState(feedback = null) {
@@ -881,6 +1372,9 @@ function initializeDailyRun(feedback = null) {
     palette: routePaletteForSeed(puzzle.seed),
     runningSince: null,
   };
+  if (session.dailyComplete) {
+    syncCompletedStreak();
+  }
   activePointerId = null;
   lastPointerCell = null;
 
@@ -913,8 +1407,84 @@ function finishStage() {
   session.stageCompleted = true;
   session.dailyComplete =
     session.stageIndex === session.schedule.length - 1;
+  const completedStreak = session.dailyComplete
+    ? syncCompletedStreak()
+    : streakRecord;
+  const common = {
+    ...telemetryContext(),
+    dailyElapsedMs: session.elapsedMs,
+    hintsUsedTotal: session.hints,
+    mistakesTotal: session.mistakes,
+    stageCount: session.schedule.length,
+  };
+
+  trackEvent(
+    levelEndEvent({
+      ...common,
+      boardCells: session.puzzle.rows * session.puzzle.cols,
+      difficulty: session.puzzle.difficulty,
+      stageElapsedMs: stageDelta(
+        session.elapsedMs,
+        session.stageElapsedBaselineMs,
+      ),
+      stageHints: stageDelta(session.hints, session.stageHintsBaseline),
+      stageMistakes: stageDelta(
+        session.mistakes,
+        session.stageMistakesBaseline,
+      ),
+      stageNumber: session.stageIndex + 1,
+    }),
+  );
+
+  if (session.dailyComplete) {
+    trackEvent(
+      dailyRunCompleteEvent({
+        ...common,
+        streak: completedStreak,
+      }),
+    );
+  }
   renderState();
   persistDailyPlay();
+}
+
+function localizedMoveMessage(result, target, attemptedLineId) {
+  switch (result.kind) {
+    case "out-of-bounds":
+    case "not-adjacent":
+      return t("moveAdjacent");
+    case "visited":
+      return t("moveVisited");
+    case "occupied":
+      return t("moveOccupied");
+    case "other-line-clue": {
+      const targetLineId = lineIdAtTarget(
+        session.puzzle,
+        session.paths,
+        target,
+      );
+      return t("moveReserved", {
+        line: lineName(targetLineId ?? (attemptedLineId === "a" ? "b" : "a")),
+      });
+    }
+    case "wrong-start":
+      return t("moveWrongStart", {
+        line: lineName(attemptedLineId),
+        clue: clueDisplayValue(attemptedLineId, 1),
+      });
+    case "finished-line":
+      return t("moveFinished");
+    case "wall":
+      return t("moveWall");
+    case "wrong-clue":
+      return t("moveOrder");
+    case "complete":
+      return t("moveSolved");
+    case "line-complete":
+      return t("moveLineComplete", { line: lineName(attemptedLineId) });
+    default:
+      return result.message;
+  }
 }
 
 function acceptCell(target) {
@@ -922,17 +1492,19 @@ function acceptCell(target) {
     return false;
   }
 
+  const attemptedLineId = session.activeLineId;
   const result = applyMove(
     session.puzzle,
     session.paths,
     session.activeLineId,
     target,
   );
+  const moveMessage = localizedMoveMessage(result, target, attemptedLineId);
 
   if (!result.accepted) {
     if (!result.quiet) {
       session.mistakes += 1;
-      renderState({ message: result.message, tone: "error" });
+      renderState({ message: moveMessage, tone: "error" });
       persistDailyPlay();
     }
 
@@ -948,7 +1520,7 @@ function acceptCell(target) {
     finishStage();
   } else if (result.kind === "line-complete") {
     session.activeLineId = chooseNextIncompleteLine() ?? session.activeLineId;
-    renderState({ message: result.message, tone: "neutral" });
+    renderState({ message: moveMessage, tone: "neutral" });
     persistDailyPlay();
   } else {
     renderState();
@@ -987,7 +1559,7 @@ function selectLine(lineId, { announce = false } = {}) {
   renderState(
     announce
       ? {
-          message: `${lineDisplayName(lineId)} selected.`,
+          message: t("lineSelected", { line: lineName(lineId) }),
           tone: "neutral",
         }
       : null,
@@ -1065,9 +1637,11 @@ function clearCurrentPuzzle() {
   session.activeLineId = session.puzzle.lines[0].id;
   session.history = [];
   renderState({
-    message: `Board cleared. The daily timer ${
-      session.runningSince === null ? "will resume with your next move" : "continues"
-    }; start again at 1 or A.`,
+    message: t(
+      session.runningSince === null
+        ? "boardClearedPaused"
+        : "boardClearedRunning",
+    ),
     tone: "neutral",
   });
   persistDailyPlay();
@@ -1086,7 +1660,7 @@ function undo() {
   session.history = undone.history;
   session.paths = undone.state.paths;
   session.activeLineId = undone.state.activeLineId;
-  renderState({ message: "One step undone.", tone: "neutral" });
+  renderState({ message: t("undone"), tone: "neutral" });
   persistDailyPlay();
   boardElement.focus({ preventScroll: true });
 }
@@ -1096,6 +1670,7 @@ function showHint() {
     return;
   }
 
+  const occupiedCells = totalPathLength(session.paths);
   rememberPlayState();
   startTimer();
   const hint = hintPaths(
@@ -1106,14 +1681,27 @@ function showHint() {
   session.paths = hint.paths;
   session.activeLineId = hint.activeLineId;
   session.hints += 1;
+  trackEvent(
+    hintUsedEvent({
+      ...telemetryContext(),
+      boardCells: session.puzzle.rows * session.puzzle.cols,
+      corrected: hint.corrected,
+      dailyElapsedMs: currentElapsed(),
+      difficulty: session.puzzle.difficulty,
+      hintNumber: session.hints,
+      occupiedCells,
+      stageCount: session.schedule.length,
+      stageNumber: session.stageIndex + 1,
+    }),
+  );
 
   if (hint.complete) {
     finishStage();
   } else {
     renderState({
       message: hint.corrected
-        ? "Conflicting detours were cleared; one correct step was added."
-        : `One correct step added to ${lineDisplayName(session.activeLineId)}.`,
+        ? t("hintCorrected")
+        : t("hintAdded", { line: lineName(session.activeLineId) }),
       tone: "neutral",
     });
     persistDailyPlay();
@@ -1136,6 +1724,9 @@ function continueDailyRun() {
     elapsedMs: session.elapsedMs,
     hints: session.hints,
     mistakes: session.mistakes,
+    stageElapsedBaselineMs: session.elapsedMs,
+    stageHintsBaseline: session.hints,
+    stageMistakesBaseline: session.mistakes,
     puzzle,
     palette: routePaletteForSeed(puzzle.seed),
     runningSince: null,
@@ -1144,7 +1735,9 @@ function continueDailyRun() {
   updateDailyDate();
   renderPuzzle();
   renderState({
-    message: `${DIFFICULTY_PROFILES[puzzle.difficulty].label} is ready. The daily timer resumes with your first valid move.`,
+    message: t("statusReady", {
+      difficulty: difficultyName(puzzle.difficulty),
+    }),
     tone: "neutral",
   });
   persistDailyPlay();
@@ -1198,8 +1791,7 @@ function selectShareFallbackText() {
 function openShareFallback(text, copiedMessage) {
   shareFallbackText.value = text;
   shareFallbackCopiedMessage = copiedMessage;
-  shareFallbackInstructions.textContent =
-    "Native sharing is unavailable here. Copy this instead.";
+  shareFallbackInstructions.textContent = t("shareFallbackInstructions");
 
   if (!shareFallbackDialog.open) {
     shareFallbackDialog.showModal();
@@ -1251,11 +1843,12 @@ function openHeaderShare() {
   const twainNumber = dailyTwainNumber(dateKey);
 
   headerShareTitle.textContent =
-    twainNumber === null ? "Share Twain" : `Share Twain #${twainNumber}`;
-  headerShareInstructions.textContent =
-    "Scan to play on another device, or copy the link.";
+    twainNumber === null
+      ? t("shareTitle")
+      : t("shareTitleNumbered", { number: twainNumber });
+  headerShareInstructions.textContent = t("shareInstructions");
   window.clearTimeout(headerShareCopyResetHandle);
-  copyHeaderShareButton.textContent = "Copy link";
+  copyHeaderShareButton.textContent = t("copyLink");
   headerShareUrl.value = url;
 
   try {
@@ -1263,8 +1856,7 @@ function openHeaderShare() {
   } catch {
     headerShareQr.hidden = true;
     headerShareQr.replaceChildren();
-    headerShareInstructions.textContent =
-      "The QR code is unavailable here. Copy the link instead.";
+    headerShareInstructions.textContent = t("qrUnavailable");
   }
 
   if (!headerShareDialog.open) {
@@ -1379,19 +1971,17 @@ function shareWithFallback({ title, text, clipboardText, copiedMessage }) {
 function copyHeaderShareUrl() {
   copyText(
     headerShareUrl.value,
-    "Today's Twain link copied.",
+    t("linkCopied"),
     () => {
-      headerShareInstructions.textContent =
-        "Automatic copying is unavailable. Select the link and copy it manually.";
-      liveAnnouncer.textContent =
-        "Automatic copying is unavailable. The Twain link is selected for manual copying.";
+      headerShareInstructions.textContent = t("manualLink");
+      liveAnnouncer.textContent = t("manualLinkAria");
       selectHeaderShareUrl();
     },
     () => {
       window.clearTimeout(headerShareCopyResetHandle);
-      copyHeaderShareButton.textContent = "Copied";
+      copyHeaderShareButton.textContent = t("copied");
       headerShareCopyResetHandle = window.setTimeout(() => {
-        copyHeaderShareButton.textContent = "Copy link";
+        copyHeaderShareButton.textContent = t("copyLink");
       }, 2400);
     },
     false,
@@ -1408,12 +1998,13 @@ function shareDailyResult() {
     elapsed: formatElapsed(currentElapsed()),
     hints: session.hints,
     twainNumber,
+    locale: activeLocale,
   });
   shareWithFallback({
     title: "Twain",
     text: resultText,
     clipboardText: `${resultText} ${canonicalUrl()}`,
-    copiedMessage: "Your Twain result was copied.",
+    copiedMessage: t("resultCopied"),
   });
 }
 
@@ -1422,10 +2013,8 @@ function copyShareFallback() {
     shareFallbackText.value,
     shareFallbackCopiedMessage,
     () => {
-      shareFallbackInstructions.textContent =
-        "Select the text and copy it manually.";
-      liveAnnouncer.textContent =
-        "Automatic copying is unavailable. The share text is selected for manual copying.";
+      shareFallbackInstructions.textContent = t("manualShare");
+      liveAnnouncer.textContent = t("manualShareAria");
       selectShareFallbackText();
     },
     closeShareFallback,
@@ -1559,9 +2148,81 @@ undoButton.addEventListener("click", undo);
 hintButton.addEventListener("click", showHint);
 continueButton.addEventListener("click", continueDailyRun);
 helpButton.addEventListener("click", openHowTo);
+privacyPreferencesButton.addEventListener("click", () => {
+  openPrivacyDialog(privacyPreferencesButton);
+});
+privacyDetailsButton.addEventListener("click", () => {
+  openPrivacyDialog(privacyDetailsButton);
+});
+bannerDeclineButton.addEventListener("click", () => {
+  saveAnalyticsConsent("denied");
+});
+bannerAcceptButton.addEventListener("click", () => {
+  saveAnalyticsConsent("granted");
+});
+privacyDeclineButton.addEventListener("click", () => {
+  saveAnalyticsConsent("denied");
+});
+privacyAcceptButton.addEventListener("click", () => {
+  saveAnalyticsConsent("granted");
+});
 shareButton.addEventListener("click", openHeaderShare);
+languageButton.addEventListener("click", () => {
+  if (languageMenu.hidden) {
+    openLanguageMenu();
+  } else {
+    closeLanguageMenu({ restoreFocus: true });
+  }
+});
+languageButton.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    openLanguageMenu(event.key === "ArrowDown" ? "first" : "last");
+  }
+});
+languageOptions.addEventListener("click", (event) => {
+  const option = event.target.closest(".language-option");
+  if (option) {
+    chooseLocale(option.dataset.locale);
+  }
+});
+languageMenu.addEventListener("keydown", (event) => {
+  const options = languageOptionElements();
+  const currentIndex = options.indexOf(document.activeElement);
+  let nextIndex = null;
+
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeLanguageMenu({ restoreFocus: true });
+    return;
+  }
+
+  if (event.key === "Tab") {
+    closeLanguageMenu();
+    return;
+  }
+
+  if (event.key === "ArrowDown") {
+    nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % options.length;
+  } else if (event.key === "ArrowUp") {
+    nextIndex =
+      currentIndex < 0
+        ? options.length - 1
+        : (currentIndex - 1 + options.length) % options.length;
+  } else if (event.key === "Home") {
+    nextIndex = 0;
+  } else if (event.key === "End") {
+    nextIndex = options.length - 1;
+  }
+
+  if (nextIndex !== null) {
+    event.preventDefault();
+    options[nextIndex]?.focus({ preventScroll: true });
+  }
+});
 shareResultButton.addEventListener("click", shareDailyResult);
 closeHowToButton.addEventListener("click", closeHowTo);
+closePrivacyButton.addEventListener("click", closePrivacyDialog);
 copyHeaderShareButton.addEventListener("click", copyHeaderShareUrl);
 closeHeaderShareButton.addEventListener("click", closeHeaderShare);
 copyShareFallbackButton.addEventListener("click", copyShareFallback);
@@ -1581,6 +2242,30 @@ shareFallbackDialog.addEventListener("click", (event) => {
     closeShareFallback();
   }
 });
+privacyDialog.addEventListener("click", (event) => {
+  if (event.target === privacyDialog) {
+    closePrivacyDialog();
+  }
+});
+privacyDialog.addEventListener("close", () => {
+  const target =
+    privacyDialogReturnFocus === privacyDetailsButton && privacyBanner.hidden
+      ? helpButton
+      : privacyDialogReturnFocus;
+  privacyDialogReturnFocus = null;
+  window.requestAnimationFrame(() => {
+    target?.focus?.({ preventScroll: true });
+  });
+});
+document.addEventListener("pointerdown", (event) => {
+  if (
+    !languageMenu.hidden &&
+    !languageMenu.contains(event.target) &&
+    !languageButton.contains(event.target)
+  ) {
+    closeLanguageMenu();
+  }
+});
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
@@ -1590,7 +2275,7 @@ document.addEventListener("visibilitychange", () => {
 
   if (taiwanDateKey() !== session.dateKey) {
     initializeDailyRun({
-      message: "A new Taiwan day has begun. Today's first board is ready.",
+      message: t("newDay"),
       tone: "neutral",
     });
   }
@@ -1598,4 +2283,7 @@ document.addEventListener("visibilitychange", () => {
 
 window.addEventListener("pagehide", persistDailyPlay);
 
+applyLocale();
+canonicalizeLocation();
+analytics.initialize();
 initializeDailyRun();

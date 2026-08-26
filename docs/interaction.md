@@ -18,6 +18,9 @@
   history,
   hints,
   mistakes,
+  stageElapsedBaselineMs,
+  stageHintsBaseline,
+  stageMistakesBaseline,
   stageCompleted,
   dailyComplete
 }
@@ -25,7 +28,7 @@
 
 `palette` is derived from `puzzle.seed` and affects presentation only. Rule transitions return new path maps; they do not mutate the puzzle or existing paths. History snapshots include both paths and the active line, so Undo is global and chronological across line switches.
 
-The versioned localStorage record omits the deterministic schedule, regenerated puzzle, palette, transient `runningSince`, and derived completion flags. Restore re-derives the schedule, accepts only its current Taiwan date/stage, and replays every path and history snapshot through `applyMove()`. Stale, malformed, or illegal records reset to today's first selected stage.
+The versioned localStorage record omits the deterministic schedule, regenerated puzzle, palette, transient `runningSince`, and derived completion flags. Restore re-derives the schedule, accepts only its current Taiwan date/stage, and replays every path and history snapshot through `applyMove()`. Stale, malformed, or illegal records reset to today's first selected stage. The three stage baselines are additive v2 fields used only to derive stage-level elapsed time, Hint count, and mistake count. Legacy records with all three absent restore safely with unknown per-stage deltas.
 
 ## Cell intent
 
@@ -63,9 +66,28 @@ This guarantees progress. Because valid alternate paths and partitions are accep
 - Continue generates the next board while paused. The first accepted move or Hint resumes from accumulated time.
 - Clear empties only the current paths/history. A running timer keeps running; a restored or newly advanced paused timer remains paused until play resumes.
 - Completion of the final selected level stops the timer. Intermediate overlays use **Nicely done!**, cumulative Hint count, and **Next level**. The final overlay uses **Well played!**, completed time plus Hint count, a live countdown to the next Taiwan midnight, and result Share; neither state prints a level/daily-complete kicker. Both overlays generate seeded, varied particles from all eight perimeter directions and animate explicit ballistic checkpoints with downward gravity; intermediate completion gets one quick wave and daily completion gets three independently generated waves. Veil and panel timing stay unchanged, and the reduced-motion override still collapses the effect.
+- Final completion idempotently records one streak day for `dateKey`; intermediate completion and opening a board do not. A completion immediately after the last recorded Taiwan date extends current streak, while a gap resets current streak to one and preserves longest streak and total completed days. The counters stay off-screen.
 - Reload restores elapsed time and paths but intentionally remains paused. This avoids charging time while the page was closed.
 
 The browser clock supplies the Taiwan date. The existing timer update loop also refreshes the final countdown and compares the active date, so a continuously visible completed run automatically becomes the next day's first board at zero. Initial load and a hidden tab becoming visible perform the same changed-date reset.
+
+## Language selection
+
+The rightmost globe header action toggles an anchored single-choice menu. Its rows use locale autonyms and radio semantics: **Automatic** is first, followed by Traditional Chinese (`繁體中文`), English, Simplified Chinese, Japanese, Korean, Spanish, and Brazilian Portuguese. Opening focuses the checked row; Up/Down wrap, Home/End jump, Escape closes and restores focus, Tab closes without trapping focus, and a pointer press outside closes quietly.
+
+On load, a supported `twain:locale:v1` value wins. Otherwise Twain walks `navigator.languages` and `navigator.language` in preference order, canonicalizes each with `Intl.Locale`, and selects the first supported language. `zh-Hant` or TW/HK/MO Chinese resolves to `zh-TW`; other Chinese resolves to `zh-CN`; Portuguese resolves to the available `pt-BR`; unsupported preferences fall back to English. Choosing an explicit row stores its canonical code. Choosing **Automatic** removes the override and immediately reapplies the browser match.
+
+A locale change updates `html[lang]`, metadata/title, localized date, controls, tutorial, progress/completion copy, dialogs, move feedback, cell/board ARIA, and sharing text, then rerenders the current board without changing its puzzle, paths, history, timer, Hint count, or persisted daily record. The brand **Twain** and displayed clue systems `1…`/`A…` remain invariant.
+
+## Analytics consent and events
+
+With no valid `twain:analytics-consent:v1` record, a fixed localized privacy banner is visible at the bottom of the viewport. **Decline** and **Allow analytics** are direct actions; **Privacy details** opens a native modal that names both the collected outcome fields and excluded path/identity fields. Help contains a persistent **Privacy choices** entry so a saved choice is reversible without adding another header action.
+
+A successful choice stores `version`, `state`, and `updatedAt`, hides the banner, updates the modal status, and announces the outcome. If storage fails, the choice is not treated as permission, the banner remains, and analytics stays disabled. A grant can initialize the tag only when the separate build-time configuration is enabled and valid. A decline never initializes it. Revoking an already active tag queues denied consent and reloads, after which the declined startup path creates no tag.
+
+The first accepted move or Hint on a fresh stage emits `level_start`; the first stage also emits `daily_run_start`. Hint emits one `hint_used` outcome after its board transition. Solving emits `level_end`, and the final stage also emits `daily_run_complete` after streak transition. Restoring completed play does not replay events. Rejected moves are aggregated into completion mistake counts rather than generating noisy per-move events. Event dispatch is a no-op unless the consented transport is active.
+
+The event builders receive bounded context and aggregate counters only. They never receive path arrays, individual cell targets, puzzle seeds, clue values, names, account identifiers, or free text. [analytics.md](analytics.md) owns the complete parameter dictionary, rollout steps, and analysis caveats.
 
 ## Sharing and URL state
 
@@ -75,12 +97,12 @@ The header dialog's Copy button first tries secure-context Async Clipboard. Loca
 
 Final-result Share calls the Web Share API synchronously within its original user activation; no awaited work may precede `navigator.share()`. Native sharing is attempted only in a secure context, after an optional `canShare()` preflight. A valid Promise opens the platform share sheet. User cancellation (`AbortError`) stays silent; a synchronous exception, non-Promise WebKit result, or other rejection opens the visible sharing fallback instead of trying another activation-gated API after Share has consumed the gesture. When Web Share is unavailable, the same Clipboard/compatibility/manual sequence applies.
 
-For numbered dates, final-result Share uses `I completed today's Twain #N in mm:ss with <Hint summary>. Can you beat my time?`, where the summary is `no hints`, `1 hint`, or `<k> hints`, and appends the canonical URL for copy fallbacks. A pre-launch device date retains the unnumbered identity while preserving the time and Hint summary. Another browser derives the same board set from its current Taiwan date and the deployed generation version. Historical dates, custom seeds, and stage selection are not URL features.
+For numbered dates, English final-result Share uses `I completed today's Twain #N in mm:ss with <Hint summary>. Can you beat my time?`, where the summary is `no hints`, `1 hint`, or `<k> hints`. Every supported locale owns the equivalent sentence and Hint grammar; copy fallbacks append the canonical URL. A pre-launch device date retains the localized unnumbered identity while preserving the time and Hint summary. Another browser derives the same board set from its current Taiwan date and the deployed generation version regardless of its locale. Historical dates, custom seeds, and stage selection are not URL features.
 
 ## Tutorial dialog
 
-Help opens a native modal dialog containing the two rule cards and keyboard guidance. Header Share uses a separate native modal for its QR and URL. Each close control, Escape, and a click on the backdrop dismisses its dialog; native focus restoration returns keyboard users to the originating header action. Neither dialog is part of page flow, so it can never push the board below the fold.
+Help opens a native localized modal dialog containing the two rule cards, keyboard guidance, and the persistent Privacy choices entry. Header Share and Privacy details use separate localized native modals. Each close control, Escape, and a click on the backdrop dismisses its dialog; focus returns to a stable originating control. Dialogs are outside page flow, so they cannot push the board below the fold. The initial privacy banner is intentionally fixed and adds scroll clearance until a choice is saved.
 
 ## Rendering layers
 
-One SVG renders the grid, both routes, walls, and border. HTML overlays render round/square clues, shared hit targets for semantic labels and input, and the completion veil/panel over the board. Internal integer clues remain unchanged: line `a` displays numbers and line `b` maps to `A…Z`, `AA…`. A versioned seed derivation selects a curated contrasting gradient pair. Routes are never used as the hit-test surface. Non-completion feedback goes only to an off-layout `aria-live` announcer and visual board/control states.
+One SVG renders the grid, both routes, walls, and border. HTML overlays render round/square clues, shared hit targets with localized semantic labels and input, and the completion veil/panel over the board. Internal integer clues remain unchanged: line `a` displays numbers and line `b` maps to `A…Z`, `AA…`. A versioned seed derivation selects a curated contrasting gradient pair. Routes are never used as the hit-test surface. Stable pure-rule outcome kinds are mapped to localized copy in `main.js`; non-completion feedback goes only to an off-layout `aria-live` announcer and visual board/control states.

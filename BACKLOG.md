@@ -18,10 +18,15 @@ This file contains unresolved questions, carried risks, and work deliberately de
 
 - [ ] Before graduating the public preview to a stable release, benchmark synchronous 10×10 Ultra generation on representative low-end phones both at initial load (Ultra may now be first) and during a paused transition. Desktop sampling is sub-second at the median, but slower devices may need a worker or lighter bounded-search budget if latency becomes noticeable.
 
+## Analytics and privacy
+
+- [ ] Before enabling Google Analytics in production, obtain the GA4 web-stream ID, review the notice/legal basis, consent-expiry/re-prompt policy, and Google account/data-retention settings for the intended jurisdictions, configure the recommended custom definitions plus `daily_run_complete` key event, and verify every event in DebugView. Also prove with a fresh profile/network trace that undecided and declined visits load no Google tag.
+- [ ] Decide whether the browser-local consent timestamp is sufficient for the rollout's compliance/audit requirements. It is intentionally compatible with the static architecture but disappears when site data is cleared and cannot provide a central ledger or cross-device withdrawal; those requirements would need a separately approved service or consent platform.
+
 ## Quality automation
 
 - [ ] Add committed visual-regression baselines and CI browser provisioning. The local deterministic harness captures and checks real browser states, but it does not compare pixels automatically.
-- [ ] Before graduating the public preview to a stable release, spot-check multi-glyph clue fit, double-tap, long-press callout suppression, pinch zoom, scrolling, board drawing, localStorage restore, header QR scanning/link copying, the result native Share sheet, local-HTTP copy fallback, and the complete daily transition flow on physical iOS Safari. Chromium mobile emulation can prove result-share activation and application fallbacks, but cannot reproduce Safari's exact rasterization, camera scanning, native touch behavior, or OS-owned share sheet.
+- [ ] Before graduating the public preview to a stable release, spot-check multi-glyph clue fit, double-tap, long-press callout suppression, pinch zoom, scrolling, board drawing, localStorage restore, header QR scanning/link copying, the result native Share sheet, local-HTTP copy fallback, Add to Home Screen icon/name and standalone launch, and the complete daily transition flow on physical iOS Safari. Chromium mobile emulation can prove result-share activation, application fallbacks, and install-asset loading, but cannot reproduce Safari's exact rasterization, camera scanning, native touch behavior, SpringBoard mask, Add to Home Screen sheet, or OS-owned share sheet.
 
 ## Responsive design
 
@@ -31,3 +36,7 @@ This file contains unresolved questions, carried risks, and work deliberately de
 
 - [ ] Before graduating the public preview to a stable release, add a non-outline keyboard-focus cue for the board that preserves the square, border-free visual treatment.
 - [ ] Before graduating the public preview to a stable release, validate inactive-line clue contrast and active-line discoverability with keyboard and low-vision users. The current 45% opacity is an intentionally strong prototype cue but reduces clue contrast until that line is selected.
+
+## Localization
+
+- [ ] Before graduating the public preview to a stable release, have native speakers review the six non-English locale catalogs end to end, including game terminology, move/error feedback, tutorial/privacy/completion tone, accessibility labels, Hint grammar, and result-sharing copy. The current translations are complete and mechanically verified but have not had professional linguistic review.

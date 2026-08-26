@@ -15,6 +15,8 @@ test("static entry point references relative, present assets", async () => {
     "./styles.css",
     "./src/main.js",
     "./assets/twain-mark.svg",
+    "./manifest.webmanifest",
+    "./assets/icons/apple-touch-icon.png",
   ];
 
   for (const asset of expectedAssets) {
@@ -53,13 +55,39 @@ test("runtime source has no bare package imports", async () => {
     "game.js",
     "palette.js",
     "qr.js",
+    "i18n.js",
     "share.js",
+    "analytics.js",
+    "streak.js",
+    "telemetry.js",
     "main.js",
   ];
 
   for (const filename of filenames) {
     assert.doesNotMatch(await source(`src/${filename}`), /from\s+["'](?!\.)/);
   }
+});
+
+test("optional analytics remains consent-gated and absent from static markup", async () => {
+  const [html, analyticsSource, main] = await Promise.all([
+    source("index.html"),
+    source("src/analytics.js"),
+    source("src/main.js"),
+  ]);
+
+  assert.match(html, /id="privacyBanner"[\s\S]*role="region"/);
+  assert.match(html, /id="bannerDeclineButton"/);
+  assert.match(html, /id="bannerAcceptButton"/);
+  assert.match(html, /id="privacyDialog"/);
+  assert.match(html, /id="privacyPreferencesButton"/);
+  assert.doesNotMatch(html, /googletagmanager|google-analytics/);
+  assert.match(analyticsSource, /enabled: false/);
+  assert.match(analyticsSource, /measurementId: ""/);
+  assert.match(
+    analyticsSource,
+    /readAnalyticsConsent\(storage\)\?\.state !== "granted"/,
+  );
+  assert.match(main, /canonicalizeLocation\(\);\s*analytics\.initialize\(\);/);
 });
 
 test("public project identity presents Twain as one daily run", async () => {
@@ -100,6 +128,13 @@ test("public project identity presents Twain as one daily run", async () => {
   assert.doesNotMatch(html, /GMT\+8/);
   assert.match(html, /id="helpButton"/);
   assert.match(html, /id="shareButton"/);
+  assert.match(html, /id="languageButton"/);
+  assert.match(
+    html,
+    /id="helpButton"[\s\S]*id="shareButton"[\s\S]*id="languageButton"[\s\S]*<\/div>\s*<div[\s\S]*id="languageMenu"/,
+  );
+  assert.match(html, /id="languageMenu"[\s\S]*role="menu"/);
+  assert.match(html, /aria-haspopup="menu"/);
   assert.match(html, /<dialog class="how-to-dialog" id="howToDialog"/);
   assert.doesNotMatch(html, /copyLinkTop|>\s*Share today\s*</);
   assert.match(readme, /^# Twain$/m);
@@ -125,6 +160,25 @@ test("public project identity presents Twain as one daily run", async () => {
     packageMetadata.scripts["visual-qa"],
     "node .agents/skills/visual-qa/scripts/run.mjs",
   );
+});
+
+test("language selection auto-detects and persists an explicit override", async () => {
+  const [html, main, i18n] = await Promise.all([
+    source("index.html"),
+    source("src/main.js"),
+    source("src/i18n.js"),
+  ]);
+
+  assert.match(i18n, /LOCALE_STORAGE_KEY = "twain:locale:v1"/);
+  assert.match(i18n, /new Intl\.Locale\(requested\)/);
+  assert.match(i18n, /script === "Hant"/);
+  assert.match(main, /navigator\.languages/);
+  assert.match(main, /window\.localStorage\.setItem\(LOCALE_STORAGE_KEY/);
+  assert.match(main, /window\.localStorage\.removeItem\(LOCALE_STORAGE_KEY/);
+  assert.match(main, /document\.documentElement\.lang = activeLocale/);
+  assert.match(main, /role", "menuitemradio"/);
+  assert.match(main, /formatDailyResultShareText\(\{[\s\S]*locale: activeLocale/);
+  assert.match(html, /class="language-menu-options" id="languageOptions"/);
 });
 
 test("daily-only chrome exposes timer, progress, and Clear in order", async () => {
@@ -287,7 +341,7 @@ test("daily runtime owns deterministic progression, persistence, and rollover", 
   assert.match(main, /document\.execCommand\("copy"\)/);
   assert.match(main, /openShareFallback\(fallbackText, copiedMessage\)/);
   assert.match(main, /millisecondsUntilNextTaiwanDay\(\)/);
-  assert.match(main, /completionTitle\.textContent = "Well played!"/);
+  assert.match(main, /completionTitle\.textContent = t\("completionWell"\)/);
   assert.match(main, /completionOverlay\.classList\.toggle\([\s\S]*"is-daily-complete"/);
   assert.match(main, /const DAILY_CONFETTI_WAVES = 3;/);
   assert.match(main, /const DAILY_CONFETTI_PER_WAVE = 16;/);
@@ -298,7 +352,7 @@ test("daily runtime owns deterministic progression, persistence, and rollover", 
   assert.match(main, /--cheer-\$\{label\}-x/);
   assert.match(main, /piece\.style\.animationIterationCount = "1"/);
   assert.match(main, /renderCelebration\(session\.dailyComplete\)/);
-  assert.match(main, /Come back in \$\{formatCountdown/);
+  assert.match(main, /t\("countdown", \{[\s\S]*formatCountdown/);
   assert.match(main, /shareResultButton\.addEventListener\("click", shareDailyResult\)/);
   assert.match(main, /formatDailyResultShareText\(\{/);
   assert.match(main, /hints:\s*session\.hints/);

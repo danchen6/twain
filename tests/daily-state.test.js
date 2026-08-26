@@ -38,6 +38,9 @@ test("daily play records round-trip paths, history, timer, and counters", () => 
   play.elapsedMs = 12_345;
   play.hints = 2;
   play.mistakes = 3;
+  play.stageElapsedBaselineMs = 1_000;
+  play.stageHintsBaseline = 1;
+  play.stageMistakesBaseline = 2;
 
   const stored = createDailyStorageRecord(play);
   const restored = restoreDailyPlay(stored, dateKey, puzzle);
@@ -48,6 +51,9 @@ test("daily play records round-trip paths, history, timer, and counters", () => 
   assert.equal(restored.elapsedMs, 12_345);
   assert.equal(restored.hints, 2);
   assert.equal(restored.mistakes, 3);
+  assert.equal(restored.stageElapsedBaselineMs, 1_000);
+  assert.equal(restored.stageHintsBaseline, 1);
+  assert.equal(restored.stageMistakesBaseline, 2);
   assert.equal(restored.stageCompleted, false);
   assert.equal(restored.dailyComplete, false);
 });
@@ -92,6 +98,14 @@ test("stale, malformed, and illegal daily records are rejected", () => {
   );
   assert.equal(
     restoreDailyPlay(
+      { ...stored, stageElapsedBaselineMs: stored.elapsedMs + 1 },
+      dateKey,
+      puzzle,
+    ),
+    null,
+  );
+  assert.equal(
+    restoreDailyPlay(
       { ...stored, paths: { a: [{ row: 999, col: 999 }], b: [] } },
       dateKey,
       puzzle,
@@ -103,4 +117,18 @@ test("stale, malformed, and illegal daily records are rejected", () => {
     RangeError,
   );
   assert.throws(() => createDailyStorageRecord(play, -1), RangeError);
+});
+
+test("legacy v2 records restore with unknown analytics baselines", () => {
+  const puzzle = dailyPuzzle();
+  const play = createDailyPlay(dateKey, puzzle);
+  const stored = createDailyStorageRecord(play);
+  delete stored.stageElapsedBaselineMs;
+  delete stored.stageHintsBaseline;
+  delete stored.stageMistakesBaseline;
+
+  const restored = restoreDailyPlay(stored, dateKey, puzzle);
+  assert.equal(restored.stageElapsedBaselineMs, null);
+  assert.equal(restored.stageHintsBaseline, null);
+  assert.equal(restored.stageMistakesBaseline, null);
 });

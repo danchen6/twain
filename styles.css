@@ -47,6 +47,10 @@ body {
     var(--canvas);
 }
 
+body.has-privacy-banner {
+  padding-bottom: 152px;
+}
+
 button,
 summary,
 a {
@@ -84,7 +88,7 @@ button:disabled {
   position: relative;
   z-index: 10;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: clamp(8px, 2vw, 24px);
   min-height: 64px;
@@ -134,7 +138,8 @@ button:disabled {
 .header-icon-button,
 .dialog-close,
 .pill-button,
-.action-button {
+.action-button,
+.text-button {
   border: 0;
   background: none;
 }
@@ -160,6 +165,11 @@ button:disabled {
   background: #f1efec;
 }
 
+#languageButton[aria-expanded="true"] {
+  color: var(--ink);
+  background: #e9e6e2;
+}
+
 #helpButton {
   color: #fff;
   background: var(--ink);
@@ -180,6 +190,91 @@ button:disabled {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.8;
+}
+
+.language-menu {
+  position: absolute;
+  top: calc(100% - 4px);
+  right: clamp(12px, 4vw, 56px);
+  z-index: 20;
+  width: min(276px, calc(100vw - 24px));
+  max-height: min(520px, calc(100svh - 76px));
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid rgb(25 25 25 / 12%);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 98%);
+  box-shadow: 0 18px 48px rgb(25 25 25 / 18%);
+}
+
+.language-menu[hidden] {
+  display: none;
+}
+
+.language-menu-title {
+  margin: 0;
+  padding: 8px 10px 7px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 760;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.language-menu-options {
+  display: grid;
+  gap: 2px;
+}
+
+.language-option {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--ink);
+  background: transparent;
+  font-size: 0.88rem;
+  font-weight: 610;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.language-option:hover,
+.language-option:focus-visible {
+  background: #f1efec;
+}
+
+.language-option.is-automatic {
+  margin-bottom: 5px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 9px 9px 0 0;
+}
+
+.language-option-check {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 50%;
+  color: #fff;
+  background: #fff;
+  font-size: 0.72rem;
+  line-height: 1;
+  place-items: center;
+}
+
+.language-option[aria-checked="true"] {
+  font-weight: 740;
+}
+
+.language-option[aria-checked="true"] .language-option-check {
+  border-color: var(--ink);
+  background: var(--ink);
 }
 
 .page-shell {
@@ -661,7 +756,8 @@ button:disabled {
 
 .how-to-dialog,
 .header-share-dialog,
-.share-fallback-dialog {
+.share-fallback-dialog,
+.privacy-dialog {
   width: min(calc(100% - 32px), 640px);
   max-width: none;
   max-height: calc(100svh - 32px);
@@ -675,13 +771,15 @@ button:disabled {
 
 .how-to-dialog[open],
 .header-share-dialog[open],
-.share-fallback-dialog[open] {
+.share-fallback-dialog[open],
+.privacy-dialog[open] {
   animation: tutorial-pop 180ms ease-out both;
 }
 
 .how-to-dialog::backdrop,
 .header-share-dialog::backdrop,
-.share-fallback-dialog::backdrop {
+.share-fallback-dialog::backdrop,
+.privacy-dialog::backdrop {
   background: rgb(25 25 25 / 42%);
   backdrop-filter: blur(2px);
   animation: tutorial-backdrop 160ms ease-out both;
@@ -689,7 +787,8 @@ button:disabled {
 
 .how-to-panel,
 .header-share-panel,
-.share-fallback-panel {
+.share-fallback-panel,
+.privacy-panel {
   max-height: calc(100svh - 32px);
   overflow: auto;
   padding: clamp(18px, 4vw, 26px);
@@ -701,7 +800,8 @@ button:disabled {
 
 .how-to-header,
 .header-share-header,
-.share-fallback-header {
+.share-fallback-header,
+.privacy-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -711,7 +811,8 @@ button:disabled {
 
 .how-to-header h2,
 .header-share-header h2,
-.share-fallback-header h2 {
+.share-fallback-header h2,
+.privacy-header h2 {
   margin: 0;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 1.55rem;
@@ -817,6 +918,142 @@ button:disabled {
   display: flex;
   justify-content: flex-end;
   margin-top: 14px;
+}
+
+.text-button {
+  padding: 2px 0;
+  border-radius: 2px;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 720;
+  line-height: 1.35;
+  text-decoration: underline;
+  text-decoration-color: rgb(25 25 25 / 32%);
+  text-underline-offset: 3px;
+}
+
+.text-button:hover {
+  text-decoration-color: currentColor;
+}
+
+.how-to-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.privacy-dialog {
+  width: min(calc(100% - 32px), 560px);
+}
+
+.privacy-intro {
+  margin: -4px 0 16px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.privacy-details {
+  display: grid;
+  gap: 10px;
+}
+
+.privacy-details section {
+  padding: 14px 15px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #fbfaf8;
+}
+
+.privacy-details h3 {
+  margin: 0 0 5px;
+  font-size: 0.86rem;
+}
+
+.privacy-details p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.privacy-status {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.privacy-actions,
+.privacy-banner-actions {
+  display: flex;
+  gap: 9px;
+}
+
+.privacy-actions {
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.privacy-choice-button {
+  min-width: 132px;
+  border: 1px solid var(--line-strong);
+}
+
+.privacy-choice-button.filled {
+  border-color: var(--ink);
+}
+
+.privacy-banner {
+  position: fixed;
+  z-index: 40;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 18px max(20px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom))
+    max(20px, env(safe-area-inset-left));
+  border-top: 1px solid rgb(25 25 25 / 14%);
+  background: rgb(255 255 255 / 98%);
+  box-shadow: 0 -14px 44px rgb(25 25 25 / 13%);
+}
+
+.privacy-banner[hidden] {
+  display: none;
+}
+
+.privacy-banner-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(20px, 5vw, 64px);
+  width: min(100%, 1080px);
+  margin: 0 auto;
+}
+
+.privacy-banner-copy {
+  min-width: 0;
+}
+
+.privacy-banner-copy h2 {
+  margin: 0 0 4px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.12rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.privacy-banner-copy p {
+  max-width: 720px;
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.privacy-banner-actions {
+  flex: 0 0 auto;
 }
 
 .share-feedback {
@@ -1075,6 +1312,10 @@ kbd {
 }
 
 @media (max-width: 620px) {
+  body.has-privacy-banner {
+    padding-bottom: 230px;
+  }
+
   .site-header {
     min-height: 58px;
     padding-inline: 16px;
@@ -1107,6 +1348,23 @@ kbd {
 
   .rule-card:last-child {
     border-radius: 0 0 13px 13px;
+  }
+
+  .privacy-banner {
+    padding: 15px 16px max(15px, env(safe-area-inset-bottom));
+  }
+
+  .privacy-banner-inner {
+    grid-template-columns: 1fr;
+    gap: 13px;
+  }
+
+  .privacy-banner-actions {
+    width: 100%;
+  }
+
+  .privacy-banner-actions .privacy-choice-button {
+    flex: 1 1 0;
   }
 
 }
@@ -1151,14 +1409,16 @@ kbd {
 
   .how-to-dialog,
   .header-share-dialog,
-  .share-fallback-dialog {
+  .share-fallback-dialog,
+  .privacy-dialog {
     width: calc(100% - 16px);
     max-height: calc(100svh - 16px);
   }
 
   .how-to-panel,
   .header-share-panel,
-  .share-fallback-panel {
+  .share-fallback-panel,
+  .privacy-panel {
     max-height: calc(100svh - 16px);
   }
 
@@ -1166,15 +1426,70 @@ kbd {
     width: min(216px, 100%);
   }
 
+  .privacy-actions {
+    width: 100%;
+  }
+
+  .privacy-actions .privacy-choice-button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
 }
 
 @media (max-width: 360px) {
+  .site-header {
+    gap: 4px;
+    padding-inline: 8px;
+  }
+
+  .brand {
+    gap: 6px;
+    font-size: 0.88rem;
+  }
+
+  .brand-mark {
+    width: 26px;
+    height: 26px;
+  }
+
+  .header-actions {
+    gap: 0;
+  }
+
+  .header-date {
+    font-size: 0.875rem;
+  }
+
+  .header-icon-button {
+    width: 32px;
+    height: 32px;
+  }
+
+  .header-icon-button svg {
+    width: 18px;
+    height: 18px;
+  }
+
   .header-share-link-row {
     grid-template-columns: 1fr;
   }
 
   .header-share-copy-button {
     width: 100%;
+  }
+
+  body.has-privacy-banner {
+    padding-bottom: 252px;
+  }
+
+  .privacy-banner-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .privacy-choice-button {
+    min-width: 0;
   }
 }
 

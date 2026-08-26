@@ -105,11 +105,35 @@
             <path d="M5 10v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8" />
           </svg>
         </button>
+        <button
+          class="header-icon-button"
+          id="languageButton"
+          type="button"
+          aria-label="Choose language"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          aria-controls="languageMenu"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M3 12h18M12 3c2.4 2.5 3.6 5.5 3.6 9S14.4 18.5 12 21M12 3c-2.4 2.5-3.6 5.5-3.6 9s1.2 6.5 3.6 9" />
+          </svg>
+        </button>
+      </div>
+      <div
+        class="language-menu"
+        id="languageMenu"
+        role="menu"
+        aria-labelledby="languageMenuTitle"
+        hidden
+      >
+        <p class="language-menu-title" id="languageMenuTitle">Language</p>
+        <div class="language-menu-options" id="languageOptions"></div>
       </div>
     </header>
 
     <main class="page-shell">
-      <section class="game-card" aria-label="Twain puzzle">
+      <section class="game-card" id="gameCard" aria-label="Twain puzzle">
         <div class="game-toolbar">
           <div class="timer" id="dailyTimer" aria-label="Daily elapsed time, paused">
             <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -180,7 +204,7 @@
                     <path d="M12 15V3m0 0L8 7m4-4 4 4" />
                     <path d="M5 10v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8" />
                   </svg>
-                  Share
+                  <span id="shareResultLabel">Share</span>
                 </button>
               </div>
             </div>
@@ -193,14 +217,14 @@
               <path d="m9 7-5 5 5 5" />
               <path d="M5 12h8.5a5.5 5.5 0 0 1 5.5 5.5V19" />
             </svg>
-            Undo
+            <span id="undoLabel">Undo</span>
           </button>
           <button class="action-button primary" id="hintButton" type="button">
             <svg aria-hidden="true" viewBox="0 0 24 24">
               <path d="M9 18h6M10 21h4" />
               <path d="M8.4 15.1A6 6 0 1 1 15.6 15c-.9.65-1.35 1.3-1.35 2h-4.5c0-.7-.45-1.3-1.35-1.9Z" />
             </svg>
-            Hint
+            <span id="hintLabel">Hint</span>
           </button>
         </div>
 
@@ -277,6 +301,15 @@
           Keyboard: <kbd>N</kbd>/<kbd>L</kbd> selects a line, arrows move, Enter
           starts, Backspace undoes, <kbd>H</kbd> hints, and <kbd>R</kbd> clears.
         </p>
+        <div class="how-to-footer">
+          <button
+            class="text-button"
+            id="privacyPreferencesButton"
+            type="button"
+            aria-haspopup="dialog"
+            aria-controls="privacyDialog"
+          >Privacy choices</button>
+        </div>
       </div>
     </dialog>
 
@@ -309,7 +342,11 @@
           role="img"
           aria-label="QR code for today's Twain link"
         ></div>
-        <label class="header-share-url-label" for="headerShareUrl">Link</label>
+        <label
+          class="header-share-url-label"
+          id="headerShareUrlLabel"
+          for="headerShareUrl"
+        >Link</label>
         <div class="header-share-link-row">
           <input
             class="header-share-url"
@@ -371,6 +408,104 @@
         </div>
       </div>
     </dialog>
+
+    <dialog
+      class="privacy-dialog"
+      id="privacyDialog"
+      aria-labelledby="privacyDialogTitle"
+      aria-describedby="privacyDialogIntro"
+    >
+      <div class="privacy-panel">
+        <div class="privacy-header">
+          <h2 id="privacyDialogTitle">Privacy &amp; analytics</h2>
+          <button
+            class="dialog-close"
+            id="closePrivacyButton"
+            type="button"
+            aria-label="Close privacy choices"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+        <p class="privacy-intro" id="privacyDialogIntro">
+          Your choice is stored only in this browser and can be changed at any
+          time.
+        </p>
+        <div class="privacy-details">
+          <section>
+            <h3 id="privacyCollectTitle">If you allow analytics</h3>
+            <p id="privacyCollectCopy">
+              When Google Analytics is configured, Twain sends gameplay
+              milestones, time, hints, mistakes, streak totals, interface
+              settings, and basic device and approximate location data.
+            </p>
+          </section>
+          <section>
+            <h3 id="privacyAvoidTitle">What Twain does not send</h3>
+            <p id="privacyAvoidCopy">
+              Puzzle paths, individual moves, puzzle seeds, names, email
+              addresses, account IDs, and free-text content are excluded.
+            </p>
+          </section>
+        </div>
+        <p class="privacy-status" id="privacyStatus">
+          Current choice: not selected.
+        </p>
+        <div class="privacy-actions">
+          <button
+            class="pill-button privacy-choice-button"
+            id="privacyDeclineButton"
+            type="button"
+          >Decline</button>
+          <button
+            class="pill-button filled privacy-choice-button"
+            id="privacyAcceptButton"
+            type="button"
+          >Allow analytics</button>
+        </div>
+      </div>
+    </dialog>
+
+    <section
+      class="privacy-banner"
+      id="privacyBanner"
+      role="region"
+      aria-labelledby="privacyBannerTitle"
+      aria-describedby="privacyBannerCopy"
+      hidden
+    >
+      <div class="privacy-banner-inner">
+        <div class="privacy-banner-copy">
+          <h2 id="privacyBannerTitle">Privacy &amp; analytics</h2>
+          <p id="privacyBannerCopy">
+            Twain stores game progress on this device. Optional Google
+            Analytics helps us understand completions, play time, streaks, and
+            hint use, and stays off until you allow it.
+          </p>
+          <button
+            class="text-button"
+            id="privacyDetailsButton"
+            type="button"
+            aria-haspopup="dialog"
+            aria-controls="privacyDialog"
+          >Privacy details</button>
+        </div>
+        <div class="privacy-banner-actions">
+          <button
+            class="pill-button privacy-choice-button"
+            id="bannerDeclineButton"
+            type="button"
+          >Decline</button>
+          <button
+            class="pill-button filled privacy-choice-button"
+            id="bannerAcceptButton"
+            type="button"
+          >Allow analytics</button>
+        </div>
+      </div>
+    </section>
 
     <div
       class="share-feedback"

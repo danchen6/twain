@@ -10,6 +10,12 @@ Guide the round Number line through `1, 2, 3…` and the square Letter line thro
 
 Each Taiwan calendar date deterministically samples and shuffles three to five unique levels from Easy, Medium, Hard, Extra, and Ultra. The launch run on August 26, 2026 is Twain #1, with the public number increasing once per Taiwan calendar day. Everyone running the same version sees the same schedule and boards for that date. Clear the selected levels in order against one shared timer; progress, current paths, and elapsed time resume from local storage in the same browser. Header Share opens the canonical date-driven URL as a locally generated QR code and copyable link; the finished result adds the Twain number, elapsed time, and Hint count.
 
+The full UI is localized in Traditional Chinese (`繁體中文`, `zh-TW`), English, Simplified Chinese, Japanese, Korean, Spanish, and Brazilian Portuguese. Twain follows the browser locale automatically; the rightmost globe menu can persist an explicit choice or return to Automatic. Language changes presentation and share copy only—the daily schedule, puzzle, progress, and Taiwan date contract stay unchanged.
+
+Shared links publish a versioned rich preview built from real Twain gameplay. Add to Home Screen uses dedicated opaque icons and a standalone manifest on supported browsers; Twain remains a network-served static game and does not claim offline support.
+
+Completing the full daily run advances a browser-local streak (not shown in the UI yet). Optional Google Analytics support is disabled until a Measurement ID is configured and the player explicitly allows analytics through the localized privacy notice; declined sessions load no Google tag. See [docs/analytics.md](docs/analytics.md) for the event and privacy contract.
+
 Every board is generated locally from complete witness lines, so it is always solvable. A bounded solver ranks deterministic candidate pools by search effort and solution density rather than assuming that fewer clues or more walls are automatically harder. The stage seed also selects one of several curated, high-contrast route palettes.
 
 ## Run locally

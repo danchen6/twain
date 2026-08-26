@@ -29,6 +29,7 @@ Do not add a framework, package dependency, transpiler, bundler, runtime server,
 - Every Taiwan calendar date (GMT+8) deterministically samples and shuffles three to five unique daily stages from Easy, Medium, Hard, Extra, and Ultra. The schedule, stage seeds, and generated boards must be identical across browsers running the same deployed code.
 - Public daily numbering is launch-relative and independent of generation versions: Taiwan date 2026-08-26 is Twain #1, and every later Taiwan calendar date increments the number by one.
 - Seeded generation is deterministic. Changing output for an existing `(version, difficulty, seed)` requires a deliberate format-version decision; changing the daily date-to-seed contract requires a daily-run version decision.
+- Locale selection is presentation-only. It must not enter the Taiwan date key, public numbering, schedule, seeds, generated puzzle, rule state, or daily-play storage.
 - UI input paths (pointer, tap, and keyboard) must call the same pure rule functions in `src/game.js`.
 - Third-party trademarks, logos, proprietary assets, and copied boards must not enter the repository. All gameplay assets and daily boards must be independently created.
 - Production code has no runtime package dependency and no build step.

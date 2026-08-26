@@ -1,19 +1,27 @@
-export function formatHintCount(hints) {
-  if (!Number.isInteger(hints) || hints < 0) {
-    throw new RangeError(`Invalid hint count: ${hints}`);
-  }
+import {
+  DEFAULT_LOCALE,
+  formatLocalizedHintCount,
+  formatShareHintSummary,
+  translate,
+} from "./i18n.js";
 
-  return `${hints} ${hints === 1 ? "hint" : "hints"}`;
+export function formatHintCount(hints, locale = DEFAULT_LOCALE) {
+  return formatLocalizedHintCount(locale, hints);
 }
 
 export function formatDailyResultShareText({
   elapsed,
   hints,
   twainNumber = null,
+  locale = DEFAULT_LOCALE,
 }) {
-  const twainIdentity =
-    twainNumber === null ? "today's Twain" : `today's Twain #${twainNumber}`;
-  const hintSummary = hints === 0 ? "no hints" : formatHintCount(hints);
+  const hintSummary = formatShareHintSummary(locale, hints);
+  const key =
+    twainNumber === null ? "shareResultUnnumbered" : "shareResultNumbered";
 
-  return `I completed ${twainIdentity} in ${elapsed} with ${hintSummary}. Can you beat my time?`;
+  return translate(locale, key, {
+    number: twainNumber,
+    time: elapsed,
+    hints: hintSummary,
+  });
 }
