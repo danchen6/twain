@@ -600,7 +600,6 @@ async function main() {
         const brandMark = document.querySelector('.brand-mark');
         const brandMarkRect = brandMark.getBoundingClientRect();
         const brandText = document.querySelector('.brand > span:last-child');
-        const currentProgressStep = document.querySelector('.daily-progress-track .is-current');
         const headerDateStyle = getComputedStyle(document.querySelector('#dailyDate'));
         const helpButton = document.querySelector('#helpButton');
         const helpButtonStyle = getComputedStyle(helpButton);
@@ -624,6 +623,7 @@ async function main() {
           continueHidden: document.querySelector('#continueButton').hidden,
           continueLabel: document.querySelector('#continueButton').textContent.trim(),
           dailyDate: document.querySelector('#dailyDate').textContent.trim(),
+          dailyDateAriaLabel: document.querySelector('#dailyDate').getAttribute('aria-label'),
           dailyProgress: document.querySelector('#dailyProgress').getAttribute('aria-valuetext'),
           dailyProgressCopyPresent: Boolean(document.querySelector('.daily-progress-copy, #dailyProgressValue')),
           dailyProgressMax: document.querySelector('#dailyProgress').getAttribute('aria-valuemax'),
@@ -635,14 +635,18 @@ async function main() {
           headerDateColor: headerDateStyle.color,
           headerDateFontSize: headerDateStyle.fontSize,
           headerDateLetterSpacing: headerDateStyle.letterSpacing,
-          headerDateMatchesCurrentProgress: currentProgressStep
-            ? headerDateStyle.color === getComputedStyle(currentProgressStep).backgroundColor
-            : null,
           helpButtonPresent: Boolean(document.querySelector('#helpButton')),
           helpButtonBackground: helpButtonStyle.backgroundColor,
           helpButtonColor: helpButtonStyle.color,
           helpButtonIsRound: helpButtonStyle.borderRadius === '50%' && Math.abs(helpButtonRect.width - helpButtonRect.height) < 0.5,
           helpDialogOpen: document.querySelector('#howToDialog').open,
+          headerShareCopyLabel: document.querySelector('#copyHeaderShareButton').textContent.trim(),
+          headerShareInstructions: document.querySelector('#headerShareInstructions').textContent.trim(),
+          headerShareOpen: document.querySelector('#headerShareDialog').open,
+          headerShareQrModuleCount: document.querySelector('#headerShareQr').dataset.moduleCount ?? null,
+          headerShareQrValue: document.querySelector('#headerShareQr').dataset.value ?? null,
+          headerShareTitle: document.querySelector('#headerShareTitle').textContent.trim(),
+          headerShareUrl: document.querySelector('#headerShareUrl').value,
           hintDisabled: document.querySelector('#hintButton').disabled,
           inlineHowToPresent: Boolean(document.querySelector('details.how-to')),
           introCopyPresent: Boolean(document.querySelector('#introCopy')),
@@ -698,7 +702,6 @@ async function main() {
         const board = document.querySelector('#board').getBoundingClientRect();
         const headerDate = document.querySelector('#dailyDate');
         const headerDateStyle = getComputedStyle(headerDate);
-        const currentProgressStep = document.querySelector('.daily-progress-track .is-current');
         const brandMark = document.querySelector('.brand-mark');
         const brandMarkRect = brandMark.getBoundingClientRect();
         const brandText = document.querySelector('.brand > span:last-child');
@@ -737,9 +740,6 @@ async function main() {
             fontWeight: headerDateStyle.fontWeight,
             letterSpacing: headerDateStyle.letterSpacing,
           },
-          headerDateMatchesCurrentProgress: currentProgressStep
-            ? headerDateStyle.color === getComputedStyle(currentProgressStep).backgroundColor
-            : null,
           helpButtonBackground: helpButtonStyle.backgroundColor,
           helpButtonColor: helpButtonStyle.color,
           brandMarkLoaded: brandMark.complete && brandMark.naturalWidth > 0,
@@ -757,7 +757,7 @@ async function main() {
       })()`);
 
       assert.equal(layout.title, "Twain — Never the twain shall meet");
-      assert.equal(layout.headerDate, "Aug 29");
+      assert.equal(layout.headerDate, "#4 | Aug 29");
       assert.doesNotMatch(layout.headerDate, /GMT|UTC/);
       assert.equal(layout.headerDateStyle.fontSize, "16px");
       assert.equal(layout.headerDateStyle.fontStyle, "normal");
@@ -771,9 +771,7 @@ async function main() {
       assert.equal(layout.helpButtonColor, "rgb(255, 255, 255)");
       assert.notEqual(layout.timerIconDisplay, "none");
 
-      if (layout.headerDateMatchesCurrentProgress !== null) {
-        assert.equal(layout.headerDateMatchesCurrentProgress, true);
-      }
+      assert.equal(layout.headerDateStyle.color, "rgb(25, 25, 25)");
       assert.ok(
         layout.documentWidth <= layout.innerWidth,
         `${label} has horizontal page overflow: ${JSON.stringify(layout)}`,
@@ -1015,7 +1013,11 @@ async function main() {
       "medium",
       "extra",
     ]);
-    assert.equal(currentState.dailyDate, "Aug 29");
+    assert.equal(currentState.dailyDate, "#4 | Aug 29");
+    assert.equal(
+      currentState.dailyDateAriaLabel,
+      "Today's puzzle is Twain number 4, Aug 29",
+    );
     assert.equal(currentState.query, "");
     assert.equal(currentState.modeSelectorPresent, false);
     assert.equal(currentState.difficultySelectorPresent, false);
@@ -1043,7 +1045,7 @@ async function main() {
     assert.equal(currentState.brandTextVisible, true);
     assert.equal(currentState.headerDateFontSize, "16px");
     assert.equal(currentState.headerDateLetterSpacing, "normal");
-    assert.equal(currentState.headerDateMatchesCurrentProgress, true);
+    assert.equal(currentState.headerDateColor, "rgb(25, 25, 25)");
     assert.notEqual(currentState.timerIconDisplay, "none");
     assert.notEqual(currentState.routeAAccent, currentState.routeBAccent);
     assert.equal(currentState.rulesRouteAAccent, currentState.routeAAccent);
@@ -1078,7 +1080,7 @@ async function main() {
     assert.ok(visualContract.valuesA.every((value) => /^\d+$/.test(value)));
     assert.ok(visualContract.valuesB.every((value) => /^[A-Z]+$/.test(value)));
     checks.push(
-      "daily-only chrome, deterministic shuffled schedule, two-line Twain logo, header date, canonical URL, distinct route hues, and Twain clue shapes/colors render correctly",
+      "daily-only chrome, deterministic shuffled schedule, two-line Twain logo, black numbered header identity, canonical URL, distinct route hues, and Twain clue shapes/colors render correctly",
     );
     await capture("1440x1000-daily-easy-fresh", { fullPage: true });
 
@@ -1251,105 +1253,134 @@ async function main() {
     checks.push("Hint corrects a divergent suffix without resetting daily time");
 
     await evaluate(`
-      Object.defineProperty(navigator, 'canShare', {
-        configurable: true,
-        value: () => true,
-      });
       Object.defineProperty(navigator, 'share', {
         configurable: true,
-        value: (payload) => {
-          window.__twainShareActivation = navigator.userActivation?.isActive ?? null;
-          window.__twainSharePayload = payload;
+        value: () => {
+          window.__twainUnexpectedHeaderNativeShare = true;
           return Promise.resolve();
         },
       });
     `);
     await clickSelector("#shareButton");
-    await delay(25);
-    const sharePayload = await evaluate("window.__twainSharePayload");
-    assert.equal(sharePayload.title, "Twain");
-    assert.equal(sharePayload.url, baseUrl);
-    assert.equal(await evaluate("window.__twainShareActivation"), true);
-
-    await evaluate(`Object.defineProperty(navigator, 'share', {
-      configurable: true,
-      value: () => undefined,
-    })`);
-    await clickSelector("#shareButton");
     await delay(220);
     currentState = await state();
-    assert.equal(currentState.shareFallbackOpen, true);
-    assert.equal(currentState.shareFallbackText, baseUrl);
-    assert.match(currentState.shareFallbackInstructions, /Copy this instead/);
-    await capture("1440x1000-share-fallback");
-    await configureViewport({ width: 390, height: 844, mobile: true });
-    await delay(30);
-    await assertLayout("390x844 share fallback");
-    const shareFallbackLayout = await evaluate(`(() => {
-      const panel = document.querySelector('.share-fallback-panel').getBoundingClientRect();
-      const text = document.querySelector('#shareFallbackText').getBoundingClientRect();
+    assert.equal(currentState.headerShareOpen, true);
+    assert.equal(currentState.headerShareTitle, "Share Twain #4");
+    assert.equal(currentState.headerShareUrl, baseUrl);
+    assert.equal(currentState.headerShareQrValue, baseUrl);
+    assert.match(currentState.headerShareInstructions, /Scan to play/);
+    assert.ok(Number(currentState.headerShareQrModuleCount) >= 21);
+    assert.equal(currentState.activeElement, "closeHeaderShareButton");
+    assert.equal(currentState.shareFallbackOpen, false);
+    assert.equal(
+      await evaluate("window.__twainUnexpectedHeaderNativeShare ?? false"),
+      false,
+    );
+    const qrContract = await evaluate(`(() => {
+      const svg = document.querySelector('#headerShareQr svg');
+      const background = svg.querySelector('rect');
+      const modules = svg.querySelector('path');
+      const size = Number(svg.getAttribute('viewBox').split(/\\s+/).at(-1));
+      const runs = [...modules.getAttribute('d').matchAll(/M(\\d+) (\\d+)h(\\d+)/g)]
+        .map((match) => ({ x: Number(match[1]), y: Number(match[2]), width: Number(match[3]) }));
       return {
-        panel: { bottom: panel.bottom, left: panel.left, right: panel.right, top: panel.top },
-        text: { bottom: text.bottom, left: text.left, right: text.right, top: text.top },
+        background: background.getAttribute('fill'),
+        moduleFill: modules.getAttribute('fill'),
+        modulePathLength: modules.getAttribute('d').length,
+        quietBottom: size - Math.max(...runs.map((run) => run.y + 1)),
+        quietLeft: Math.min(...runs.map((run) => run.x)),
+        quietRight: size - Math.max(...runs.map((run) => run.x + run.width)),
+        quietTop: Math.min(...runs.map((run) => run.y)),
+        square: svg.getAttribute('viewBox') === '0 0 ' + size + ' ' + size,
       };
     })()`);
-    assert.ok(shareFallbackLayout.panel.left >= 0 && shareFallbackLayout.panel.right <= 390);
-    assert.ok(shareFallbackLayout.panel.top >= 0 && shareFallbackLayout.panel.bottom <= 844);
-    assert.ok(shareFallbackLayout.text.left >= shareFallbackLayout.panel.left);
-    assert.ok(shareFallbackLayout.text.right <= shareFallbackLayout.panel.right);
-    await capture("390x844-share-fallback");
-    await evaluate(`
-      Object.defineProperty(navigator, 'clipboard', {
-        configurable: true,
-        value: { writeText: () => Promise.reject(new DOMException('Clipboard blocked', 'NotAllowedError')) },
-      });
-      Object.defineProperty(document, 'execCommand', {
-        configurable: true,
-        value: () => false,
-      });
-    `);
-    await clickSelector("#copyShareFallbackButton");
-    await delay(50);
-    currentState = await state();
-    assert.equal(currentState.shareFallbackOpen, true);
-    assert.match(currentState.shareFallbackInstructions, /copy it manually/);
-    assert.equal(currentState.activeElement, "shareFallbackText");
-    await capture("390x844-share-manual-copy");
-    await clickSelector("#closeShareFallbackButton");
-    assert.equal((await state()).shareFallbackOpen, false);
-    await configureViewport({ width: 1440, height: 1000 });
+    assert.deepEqual(qrContract, {
+      background: "#fff",
+      moduleFill: "#000",
+      modulePathLength: qrContract.modulePathLength,
+      quietBottom: 4,
+      quietLeft: 4,
+      quietRight: 4,
+      quietTop: 4,
+      square: true,
+    });
+    assert.ok(qrContract.modulePathLength > 100);
+    await capture("1440x1000-header-share-dialog");
 
+    await configureViewport({ width: 768, height: 1024 });
+    await assertLayout("768x1024 header share dialog");
+    await capture("768x1024-header-share-dialog");
+    await configureViewport({ width: 390, height: 844, mobile: true });
+    await assertLayout("390x844 header share dialog");
+    const headerShareLayout = await evaluate(`(() => {
+      const panel = document.querySelector('.header-share-panel').getBoundingClientRect();
+      const qr = document.querySelector('#headerShareQr').getBoundingClientRect();
+      const link = document.querySelector('#headerShareUrl').getBoundingClientRect();
+      const copy = document.querySelector('#copyHeaderShareButton').getBoundingClientRect();
+      const bounds = (rect) => ({
+        bottom: rect.bottom,
+        height: rect.height,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        width: rect.width,
+      });
+      return {
+        copy: bounds(copy),
+        link: bounds(link),
+        panel: bounds(panel),
+        qr: bounds(qr),
+      };
+    })()`);
+    assert.ok(headerShareLayout.panel.left >= 0 && headerShareLayout.panel.right <= 390);
+    assert.ok(headerShareLayout.panel.top >= 0 && headerShareLayout.panel.bottom <= 844);
+    assert.ok(Math.abs(headerShareLayout.qr.width - headerShareLayout.qr.height) < 0.5);
+    assert.ok(headerShareLayout.link.left >= headerShareLayout.panel.left);
+    assert.ok(headerShareLayout.copy.right <= headerShareLayout.panel.right);
+    await capture("390x844-header-share-dialog");
+
+    await configureViewport({ width: 320, height: 800, mobile: true });
+    await assertLayout("320x800 header share dialog");
+    const compactShareLayout = await evaluate(`(() => {
+      const link = document.querySelector('#headerShareUrl').getBoundingClientRect();
+      const copy = document.querySelector('#copyHeaderShareButton').getBoundingClientRect();
+      const panel = document.querySelector('.header-share-panel').getBoundingClientRect();
+      const bounds = (rect) => ({
+        bottom: rect.bottom,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+      });
+      return { copy: bounds(copy), link: bounds(link), panel: bounds(panel) };
+    })()`);
+    assert.ok(compactShareLayout.panel.top >= 0 && compactShareLayout.panel.bottom <= 800);
+    assert.ok(compactShareLayout.copy.top >= compactShareLayout.link.bottom);
+    await capture("320x800-header-share-dialog");
+
+    await configureViewport({ width: 390, height: 844, mobile: true });
     await evaluate(`
-      Object.defineProperty(navigator, 'canShare', { configurable: true, value: undefined });
-      Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+      Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true });
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
         value: { writeText: async (value) => { window.__twainCopiedUrl = value; } },
       });
     `);
-    await clickSelector("#shareButton");
+    await clickSelector("#copyHeaderShareButton");
     await delay(25);
     assert.equal(await evaluate("window.__twainCopiedUrl"), baseUrl);
     currentState = await state();
     assert.match(currentState.status, /link copied/);
-    assert.equal(currentState.shareFeedbackHidden, false);
-    assert.equal(currentState.shareFeedbackText, "Today's Twain link copied.");
-    assert.equal(currentState.query, "");
-    await configureViewport({ width: 390, height: 844, mobile: true });
-    await assertLayout("390x844 share copied feedback");
-    await capture("390x844-share-copied");
-    await configureViewport({ width: 1440, height: 1000 });
+    assert.equal(currentState.headerShareCopyLabel, "Copied");
+    assert.equal(currentState.shareFeedbackHidden, true);
+    assert.equal(currentState.headerShareOpen, true);
+    await capture("390x844-header-share-copied");
+    await clickSelector("#closeHeaderShareButton");
+    assert.equal((await state()).headerShareOpen, false);
+    assert.equal((await state()).activeElement, "shareButton");
 
     await evaluate(`
       document.querySelector('#shareFeedback').hidden = true;
       Object.defineProperty(window, 'isSecureContext', { configurable: true, value: false });
-      Object.defineProperty(navigator, 'share', {
-        configurable: true,
-        value: () => {
-          window.__twainUnexpectedInsecureShare = true;
-          return Promise.resolve();
-        },
-      });
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
         value: {
@@ -1360,21 +1391,47 @@ async function main() {
         configurable: true,
         value: (command) => {
           window.__twainLegacyCopyCommand = command;
-          window.__twainLegacyCopiedUrl = document.activeElement.value;
+          window.__twainLegacyCopiedUrl = document.querySelector('.legacy-copy-source')?.value;
           return true;
         },
       });
     `);
     await clickSelector("#shareButton");
+    await clickSelector("#copyHeaderShareButton");
     await delay(25);
     assert.equal(await evaluate("window.__twainLegacyCopyCommand"), "copy");
     assert.equal(await evaluate("window.__twainLegacyCopiedUrl"), baseUrl);
-    assert.equal(await evaluate("window.__twainUnexpectedInsecureShare ?? false"), false);
-    assert.equal(await evaluate("window.__twainUnexpectedInsecureClipboard ?? false"), false);
-    assert.equal((await state()).shareFeedbackHidden, false);
+    assert.equal(
+      await evaluate("window.__twainUnexpectedInsecureClipboard ?? false"),
+      false,
+    );
+    await clickSelector("#closeHeaderShareButton");
+
+    await evaluate(`
+      Object.defineProperty(document, 'execCommand', {
+        configurable: true,
+        value: () => false,
+      });
+    `);
+    await configureViewport({ width: 320, height: 800, mobile: true });
     await evaluate("document.querySelector('#shareFeedback').hidden = true");
+    await clickSelector("#shareButton");
+    await delay(220);
+    await clickSelector("#copyHeaderShareButton");
+    await delay(80);
+    currentState = await state();
+    assert.equal(currentState.headerShareOpen, true);
+    assert.match(currentState.headerShareInstructions, /copy it manually/);
+    assert.equal(currentState.activeElement, "headerShareUrl");
+    await capture("320x800-header-share-manual-copy");
+    await clickSelector("#closeHeaderShareButton");
+    await evaluate(`
+      Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true });
+      document.querySelector('#shareFeedback').hidden = true;
+    `);
+    await configureViewport({ width: 1440, height: 1000 });
     checks.push(
-      "Share runs inside direct user activation, rejects silent WebKit-style returns, and visibly falls back through clipboard or selected legacy copy",
+      "header Share stays in-app, renders a canonical black-and-white QR with quiet zone, and copies or selects the same URL across desktop and mobile",
     );
 
     await clickSelector("#clearButton");
@@ -1719,7 +1776,7 @@ async function main() {
     await capture("320x800-daily-complete");
     await loadViewport({ width: 1440, height: 1000, fresh: false });
 
-    const resultText = `I've completed today's Twain in ${currentState.timer}. Can you beat my time?`;
+    const resultText = `I completed today's Twain #4 in ${currentState.timer} with 2 hints. Can you beat my time?`;
     await evaluate(`
       Object.defineProperty(navigator, 'canShare', {
         configurable: true,
@@ -1803,18 +1860,18 @@ async function main() {
     for (let attempt = 0; attempt < 100; attempt += 1) {
       currentState = await state();
 
-      if (currentState.dailyDate === "Aug 30") {
+      if (currentState.dailyDate === "#5 | Aug 30") {
         break;
       }
 
       await delay(100);
     }
-    assert.equal(currentState.dailyDate, "Aug 30");
+    assert.equal(currentState.dailyDate, "#5 | Aug 30");
     assert.equal(currentState.dailyProgressNow, "0");
     assert.equal(currentState.completionHidden, true);
     assert.equal(currentState.timer, "00:00");
     checks.push(
-      "daily completion restores its result overlay, shares the finished time, counts down live, and rolls into the next Taiwan day",
+      "daily completion restores its result overlay, shares the numbered time and Hint count, counts down live, and rolls into the next numbered Taiwan day",
     );
 
     await loadViewport({ width: 768, height: 1024 });

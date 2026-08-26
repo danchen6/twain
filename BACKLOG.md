@@ -21,7 +21,7 @@ This file contains unresolved questions, carried risks, and work deliberately de
 ## Quality automation
 
 - [ ] Add committed visual-regression baselines and CI browser provisioning. The local deterministic harness captures and checks real browser states, but it does not compare pixels automatically.
-- [ ] Before graduating the public preview to a stable release, spot-check multi-glyph clue fit, double-tap, long-press callout suppression, pinch zoom, scrolling, board drawing, localStorage restore, both native Share sheets, local-HTTP copy fallback, and the complete daily transition flow on physical iOS Safari. Chromium mobile emulation can prove direct user activation and application fallbacks, but cannot reproduce Safari's exact rasterization, native touch behavior, or OS-owned share sheet.
+- [ ] Before graduating the public preview to a stable release, spot-check multi-glyph clue fit, double-tap, long-press callout suppression, pinch zoom, scrolling, board drawing, localStorage restore, header QR scanning/link copying, the result native Share sheet, local-HTTP copy fallback, and the complete daily transition flow on physical iOS Safari. Chromium mobile emulation can prove result-share activation and application fallbacks, but cannot reproduce Safari's exact rasterization, camera scanning, native touch behavior, or OS-owned share sheet.
 
 ## Responsive design
 

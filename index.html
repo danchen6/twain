@@ -43,6 +43,8 @@
           id="shareButton"
           type="button"
           aria-label="Share today's Twain"
+          aria-haspopup="dialog"
+          aria-controls="headerShareDialog"
         >
           <svg aria-hidden="true" viewBox="0 0 24 24">
             <path d="M12 15V3m0 0L8 7m4-4 4 4" />
@@ -221,6 +223,56 @@
           Keyboard: <kbd>N</kbd>/<kbd>L</kbd> selects a line, arrows move, Enter
           starts, Backspace undoes, <kbd>H</kbd> hints, and <kbd>R</kbd> clears.
         </p>
+      </div>
+    </dialog>
+
+    <dialog
+      class="header-share-dialog"
+      id="headerShareDialog"
+      aria-labelledby="headerShareTitle"
+      aria-describedby="headerShareInstructions"
+    >
+      <div class="header-share-panel">
+        <div class="header-share-header">
+          <h2 id="headerShareTitle">Share Twain</h2>
+          <button
+            class="dialog-close"
+            id="closeHeaderShareButton"
+            type="button"
+            aria-label="Close sharing dialog"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+        <p id="headerShareInstructions">
+          Scan to play on another device, or copy the link.
+        </p>
+        <div
+          class="header-share-qr"
+          id="headerShareQr"
+          role="img"
+          aria-label="QR code for today's Twain link"
+        ></div>
+        <label class="header-share-url-label" for="headerShareUrl">Link</label>
+        <div class="header-share-link-row">
+          <input
+            class="header-share-url"
+            id="headerShareUrl"
+            type="url"
+            readonly
+            spellcheck="false"
+            autocomplete="off"
+          />
+          <button
+            class="pill-button filled header-share-copy-button"
+            id="copyHeaderShareButton"
+            type="button"
+          >
+            Copy link
+          </button>
+        </div>
       </div>
     </dialog>
 

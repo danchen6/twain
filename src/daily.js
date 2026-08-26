@@ -10,6 +10,7 @@ export const DIFFICULTY_CATALOG = Object.freeze([
 ]);
 export const MIN_DAILY_STAGES = 3;
 export const MAX_DAILY_STAGES = 5;
+export const FIRST_TWAIN_DATE_KEY = "2026-08-26";
 
 const TAIWAN_OFFSET_MILLISECONDS =
   TAIWAN_UTC_OFFSET_HOURS * 60 * 60 * 1000;
@@ -65,6 +66,20 @@ export function millisecondsUntilNextTaiwanDay(now = Date.now()) {
     ((taiwanTimestamp % DAY_MILLISECONDS) + DAY_MILLISECONDS) %
     DAY_MILLISECONDS;
   return DAY_MILLISECONDS - elapsedToday;
+}
+
+export function dailyTwainNumber(dateKey) {
+  if (!isDateKey(dateKey)) {
+    throw new RangeError(`Invalid daily date key: ${dateKey}`);
+  }
+
+  const dateTimestamp = Date.parse(`${dateKey}T00:00:00.000Z`);
+  const firstTwainTimestamp = Date.parse(
+    `${FIRST_TWAIN_DATE_KEY}T00:00:00.000Z`,
+  );
+  const number = (dateTimestamp - firstTwainTimestamp) / DAY_MILLISECONDS + 1;
+
+  return number >= 1 ? number : null;
 }
 
 export function dailyStageSeed(dateKey, difficulty) {

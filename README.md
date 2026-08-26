@@ -8,7 +8,7 @@ An original daily two-line path puzzle.
 
 Guide the round Number line through `1, 2, 3…` and the square Letter line through `A, B, C…`. The lines must never share a cell, and together they must fill the board. There is no prescribed quota for either line: any valid full-board partition wins.
 
-Each Taiwan calendar date deterministically samples and shuffles three to five unique levels from Easy, Medium, Hard, Extra, and Ultra. Everyone running the same version sees the same schedule and boards for that date. Clear the selected levels in order against one shared timer; progress, current paths, and elapsed time resume from local storage in the same browser. Share opens the platform menu when available and otherwise copies the canonical date-driven URL.
+Each Taiwan calendar date deterministically samples and shuffles three to five unique levels from Easy, Medium, Hard, Extra, and Ultra. The launch run on August 26, 2026 is Twain #1, with the public number increasing once per Taiwan calendar day. Everyone running the same version sees the same schedule and boards for that date. Clear the selected levels in order against one shared timer; progress, current paths, and elapsed time resume from local storage in the same browser. Header Share opens the canonical date-driven URL as a locally generated QR code and copyable link; the finished result adds the Twain number, elapsed time, and Hint count.
 
 Every board is generated locally from complete witness lines, so it is always solvable. A bounded solver ranks deterministic candidate pools by search effort and solution density rather than assuming that fewer clues or more walls are automatically harder. The stage seed also selects one of several curated, high-contrast route palettes.
 
@@ -46,4 +46,4 @@ Focused bug reports and pull requests are welcome. Read [CONTRIBUTING.md](CONTRI
 
 ## License
 
-Twain is available under the [MIT License](LICENSE). Copyright (c) 2026 Dan Chen.
+Twain is available under the [MIT License](LICENSE). Copyright (c) 2026 Dan Chen. Vendored components retain their own licenses in the [third-party notices](THIRD_PARTY_NOTICES.md).

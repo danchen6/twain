@@ -53,3 +53,5 @@ Version 4 removes the product mode field and makes every generated board a two-l
 Generator reproducibility is defined by `(version, difficulty, seed)`. Candidate index is an internal deterministic stream component. Changing output for an existing tuple requires another deliberate puzzle-version decision.
 
 The daily layer has its own version because scheduling, date-to-seed, and persistence semantics can change independently. Daily v2 deterministically samples and shuffles three to five unique profiles from the full difficulty catalog, then derives `twain-daily:v2:<YYYY-MM-DD>:<difficulty>` for each selected stage. The canonical page URL exposes neither the schedule nor these internal seeds.
+
+Public numbering is a separate, unversioned identity contract: Taiwan date `2026-08-26` is Twain #1 and each later date advances by one. The number is derived from the validated date key but never enters a puzzle seed, schema, or persisted record; changing a generation version therefore does not renumber an existing day.

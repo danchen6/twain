@@ -2,6 +2,7 @@ import {
   DAILY_STORAGE_KEY,
   dailyDifficultyAt,
   dailyStageSeed,
+  dailyTwainNumber,
   millisecondsUntilNextTaiwanDay,
   taiwanDateKey,
 } from "./daily.js";
@@ -34,6 +35,11 @@ import {
   undoPlayState,
 } from "./game.js";
 import { routePaletteForSeed } from "./palette.js";
+import { createQrCode } from "./qr.js";
+import {
+  formatDailyResultShareText,
+  formatHintCount,
+} from "./share.js";
 
 const boardElement = document.querySelector("#board");
 const gameCard = document.querySelector(".game-card");
@@ -57,6 +63,19 @@ const helpButton = document.querySelector("#helpButton");
 const shareButton = document.querySelector("#shareButton");
 const howToDialog = document.querySelector("#howToDialog");
 const closeHowToButton = document.querySelector("#closeHowToButton");
+const headerShareDialog = document.querySelector("#headerShareDialog");
+const headerShareTitle = document.querySelector("#headerShareTitle");
+const headerShareInstructions = document.querySelector(
+  "#headerShareInstructions",
+);
+const headerShareQr = document.querySelector("#headerShareQr");
+const headerShareUrl = document.querySelector("#headerShareUrl");
+const copyHeaderShareButton = document.querySelector(
+  "#copyHeaderShareButton",
+);
+const closeHeaderShareButton = document.querySelector(
+  "#closeHeaderShareButton",
+);
 const shareFallbackDialog = document.querySelector("#shareFallbackDialog");
 const shareFallbackInstructions = document.querySelector(
   "#shareFallbackInstructions",
@@ -89,6 +108,7 @@ let timerHandle = null;
 let activePointerId = null;
 let lastPointerCell = null;
 let shareFeedbackHandle = null;
+let headerShareCopyResetHandle = null;
 let shareFallbackCopiedMessage = "Twain share text copied.";
 
 function formatElapsed(milliseconds) {
@@ -116,6 +136,19 @@ function formatDailyDate(dateKey) {
     timeZone: "UTC",
   }).format(date);
   return label;
+}
+
+function formatDailyIdentity(dateKey) {
+  const dateLabel = formatDailyDate(dateKey);
+  const twainNumber = dailyTwainNumber(dateKey);
+
+  return {
+    accessibleLabel:
+      twainNumber === null
+        ? `Today's puzzle date is ${dateLabel}`
+        : `Today's puzzle is Twain number ${twainNumber}, ${dateLabel}`,
+    text: twainNumber === null ? dateLabel : `#${twainNumber} | ${dateLabel}`,
+  };
 }
 
 function canonicalUrl() {
@@ -403,7 +436,9 @@ function createHitLayer(puzzle) {
 }
 
 function updateDailyDate() {
-  dailyDate.textContent = formatDailyDate(session.dateKey);
+  const identity = formatDailyIdentity(session.dateKey);
+  dailyDate.textContent = identity.text;
+  dailyDate.setAttribute("aria-label", identity.accessibleLabel);
 }
 
 function renderPuzzle() {
@@ -736,7 +771,7 @@ function renderCompletion() {
 
   renderCelebration(session.dailyComplete);
 
-  const hintLabel = `${session.hints} ${session.hints === 1 ? "hint" : "hints"}`;
+  const hintLabel = formatHintCount(session.hints);
   completionCountdown.hidden = !session.dailyComplete;
   continueButton.hidden = session.dailyComplete;
   shareResultButton.hidden = !session.dailyComplete;
@@ -1177,10 +1212,82 @@ function closeShareFallback() {
   shareFallbackDialog.close();
 }
 
-function copyText(text, copiedMessage, onFailure, onCopied = () => {}) {
+function selectHeaderShareUrl() {
+  headerShareUrl.focus({ preventScroll: true });
+  headerShareUrl.select();
+  headerShareUrl.setSelectionRange(0, headerShareUrl.value.length);
+}
+
+function renderHeaderShareQr(url) {
+  const qrCode = createQrCode(url);
+  const namespace = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(namespace, "svg");
+  const background = document.createElementNS(namespace, "rect");
+  const modules = document.createElementNS(namespace, "path");
+
+  svg.setAttribute(
+    "viewBox",
+    `0 0 ${qrCode.viewBoxSize} ${qrCode.viewBoxSize}`,
+  );
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  svg.setAttribute("shape-rendering", "crispEdges");
+  background.setAttribute("width", String(qrCode.viewBoxSize));
+  background.setAttribute("height", String(qrCode.viewBoxSize));
+  background.setAttribute("fill", "#fff");
+  modules.setAttribute("d", qrCode.pathData);
+  modules.setAttribute("fill", "#000");
+  svg.append(background, modules);
+
+  headerShareQr.hidden = false;
+  headerShareQr.dataset.moduleCount = String(qrCode.moduleCount);
+  headerShareQr.dataset.value = url;
+  headerShareQr.replaceChildren(svg);
+}
+
+function openHeaderShare() {
+  const url = canonicalUrl();
+  const dateKey = session?.dateKey ?? taiwanDateKey();
+  const twainNumber = dailyTwainNumber(dateKey);
+
+  headerShareTitle.textContent =
+    twainNumber === null ? "Share Twain" : `Share Twain #${twainNumber}`;
+  headerShareInstructions.textContent =
+    "Scan to play on another device, or copy the link.";
+  window.clearTimeout(headerShareCopyResetHandle);
+  copyHeaderShareButton.textContent = "Copy link";
+  headerShareUrl.value = url;
+
+  try {
+    renderHeaderShareQr(url);
+  } catch {
+    headerShareQr.hidden = true;
+    headerShareQr.replaceChildren();
+    headerShareInstructions.textContent =
+      "The QR code is unavailable here. Copy the link instead.";
+  }
+
+  if (!headerShareDialog.open) {
+    headerShareDialog.showModal();
+  }
+}
+
+function closeHeaderShare() {
+  headerShareDialog.close();
+}
+
+function copyText(
+  text,
+  copiedMessage,
+  onFailure,
+  onCopied = () => {},
+  showToast = true,
+) {
   const copied = () => {
     liveAnnouncer.textContent = copiedMessage;
-    showShareFeedback(copiedMessage);
+    if (showToast) {
+      showShareFeedback(copiedMessage);
+    }
     onCopied();
   };
   const failed = () => {
@@ -1228,9 +1335,18 @@ function nativeShareAvailable(shareData) {
   }
 }
 
-function shareWithFallback({ text, clipboardText, copiedMessage }) {
+function shareWithFallback({ title, text, clipboardText, copiedMessage }) {
   const url = canonicalUrl();
-  const shareData = { title: "Twain", text, url };
+  const shareData = { url };
+
+  if (title) {
+    shareData.title = title;
+  }
+
+  if (text) {
+    shareData.text = text;
+  }
+
   const fallbackText = clipboardText ?? url;
 
   if (nativeShareAvailable(shareData)) {
@@ -1260,11 +1376,26 @@ function shareWithFallback({ text, clipboardText, copiedMessage }) {
   });
 }
 
-function shareToday() {
-  shareWithFallback({
-    text: "Play today's Twain puzzle.",
-    copiedMessage: "Today's Twain link copied.",
-  });
+function copyHeaderShareUrl() {
+  copyText(
+    headerShareUrl.value,
+    "Today's Twain link copied.",
+    () => {
+      headerShareInstructions.textContent =
+        "Automatic copying is unavailable. Select the link and copy it manually.";
+      liveAnnouncer.textContent =
+        "Automatic copying is unavailable. The Twain link is selected for manual copying.";
+      selectHeaderShareUrl();
+    },
+    () => {
+      window.clearTimeout(headerShareCopyResetHandle);
+      copyHeaderShareButton.textContent = "Copied";
+      headerShareCopyResetHandle = window.setTimeout(() => {
+        copyHeaderShareButton.textContent = "Copy link";
+      }, 2400);
+    },
+    false,
+  );
 }
 
 function shareDailyResult() {
@@ -1272,8 +1403,14 @@ function shareDailyResult() {
     return;
   }
 
-  const resultText = `I've completed today's Twain in ${formatElapsed(currentElapsed())}. Can you beat my time?`;
+  const twainNumber = dailyTwainNumber(session.dateKey);
+  const resultText = formatDailyResultShareText({
+    elapsed: formatElapsed(currentElapsed()),
+    hints: session.hints,
+    twainNumber,
+  });
   shareWithFallback({
+    title: "Twain",
     text: resultText,
     clipboardText: `${resultText} ${canonicalUrl()}`,
     copiedMessage: "Your Twain result was copied.",
@@ -1422,14 +1559,21 @@ undoButton.addEventListener("click", undo);
 hintButton.addEventListener("click", showHint);
 continueButton.addEventListener("click", continueDailyRun);
 helpButton.addEventListener("click", openHowTo);
-shareButton.addEventListener("click", shareToday);
+shareButton.addEventListener("click", openHeaderShare);
 shareResultButton.addEventListener("click", shareDailyResult);
 closeHowToButton.addEventListener("click", closeHowTo);
+copyHeaderShareButton.addEventListener("click", copyHeaderShareUrl);
+closeHeaderShareButton.addEventListener("click", closeHeaderShare);
 copyShareFallbackButton.addEventListener("click", copyShareFallback);
 closeShareFallbackButton.addEventListener("click", closeShareFallback);
 howToDialog.addEventListener("click", (event) => {
   if (event.target === howToDialog) {
     closeHowTo();
+  }
+});
+headerShareDialog.addEventListener("click", (event) => {
+  if (event.target === headerShareDialog) {
+    closeHeaderShare();
   }
 });
 shareFallbackDialog.addEventListener("click", (event) => {

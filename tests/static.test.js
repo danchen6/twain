@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -51,6 +52,8 @@ test("runtime source has no bare package imports", async () => {
     "solver.js",
     "game.js",
     "palette.js",
+    "qr.js",
+    "share.js",
     "main.js",
   ];
 
@@ -60,13 +63,26 @@ test("runtime source has no bare package imports", async () => {
 });
 
 test("public project identity presents Twain as one daily run", async () => {
-  const [html, logo, readme, packageSource, license, contributing] = await Promise.all([
+  const [
+    html,
+    logo,
+    readme,
+    packageSource,
+    license,
+    contributing,
+    thirdPartyNotices,
+    qrSource,
+    qrLicense,
+  ] = await Promise.all([
     source("index.html"),
     source("assets/twain-mark.svg"),
     source("README.md"),
     source("package.json"),
     source("LICENSE"),
     source("CONTRIBUTING.md"),
+    source("THIRD_PARTY_NOTICES.md"),
+    source("vendor/qrcode-generator.mjs"),
+    source("vendor/qrcode-generator.LICENSE"),
   ]);
   const packageMetadata = JSON.parse(packageSource);
 
@@ -91,12 +107,20 @@ test("public project identity presents Twain as one daily run", async () => {
   assert.match(readme, /\*\*Public Preview\*\*/);
   assert.match(readme, /https:\/\/danchen6\.github\.io\/twain\//);
   assert.match(readme, /\[CONTRIBUTING\.md\]\(CONTRIBUTING\.md\)/);
+  assert.match(readme, /\[third-party notices\]\(THIRD_PARTY_NOTICES\.md\)/i);
   assert.equal(packageMetadata.name, "twain");
   assert.match(packageMetadata.description, /daily two-line path puzzle/i);
   assert.equal(packageMetadata.license, "MIT");
   assert.match(license, /^MIT License$/m);
   assert.match(license, /Copyright \(c\) 2026 Dan Chen/);
   assert.match(contributing, /^# Contributing to Twain$/m);
+  assert.match(thirdPartyNotices, /qrcode-generator.*2\.0\.4/s);
+  assert.match(thirdPartyNotices, /vendor\/qrcode-generator\.LICENSE/);
+  assert.equal(
+    createHash("sha256").update(qrSource).digest("hex"),
+    "ea91d7118a5395289170da848b7c6758b996163bfbccf312591ab65a4911b7c0",
+  );
+  assert.match(qrLicense, /^MIT License$/m);
   assert.equal(
     packageMetadata.scripts["visual-qa"],
     "node .agents/skills/visual-qa/scripts/run.mjs",
@@ -206,7 +230,7 @@ test("board geometry and clue typography retain the Twain visual contract", asyn
     /--theme-accent:\s*color-mix\(in srgb, var\(--accent\) 62%, #dedad4\);/,
   );
   const headerDateRule = styles.match(/\.header-date\s*{([^}]*)}/)?.[1] ?? "";
-  assert.match(headerDateRule, /color:\s*var\(--theme-accent\);/);
+  assert.match(headerDateRule, /color:\s*var\(--ink\);/);
   assert.match(headerDateRule, /font-size:\s*1rem;/);
   assert.match(headerDateRule, /font-variant-numeric:\s*tabular-nums;/);
   assert.match(headerDateRule, /font-weight:\s*760;/);
@@ -234,16 +258,24 @@ test("board geometry and clue typography retain the Twain visual contract", asyn
 
 test("daily runtime owns deterministic progression, persistence, and rollover", async () => {
   const main = await source("src/main.js");
+  const openHeaderShareSource =
+    main.match(
+      /function openHeaderShare\(\)[\s\S]*?(?=function closeHeaderShare)/,
+    )?.[0] ?? "";
 
   assert.match(main, /dailyStageSeed\(dateKey, difficulty\)/);
   assert.match(main, /dailyDifficultyAt\(dateKey, stageIndex\)/);
+  assert.match(main, /dailyTwainNumber\(session\.dateKey\)/);
   assert.match(main, /restoreDailyPlay\(stored, dateKey, puzzle\)/);
   assert.match(main, /createDailyStorageRecord\(session, currentElapsed\(\)\)/);
   assert.match(main, /window\.localStorage\.setItem\(DAILY_STORAGE_KEY/);
   assert.match(main, /document\.addEventListener\("visibilitychange"/);
   assert.match(main, /taiwanDateKey\(\) !== session\.dateKey/);
   assert.match(main, /continueButton\.addEventListener\("click", continueDailyRun\)/);
-  assert.match(main, /shareButton\.addEventListener\("click", shareToday\)/);
+  assert.match(main, /shareButton\.addEventListener\("click", openHeaderShare\)/);
+  assert.match(openHeaderShareSource, /headerShareDialog\.showModal\(\)/);
+  assert.match(openHeaderShareSource, /renderHeaderShareQr\(url\)/);
+  assert.doesNotMatch(openHeaderShareSource, /navigator\.(?:canShare|share)/);
   assert.match(main, /!window\.isSecureContext \|\| typeof navigator\.share/);
   assert.match(main, /typeof navigator\.share !== "function"/);
   assert.match(main, /navigator\.canShare\(shareData\)/);
@@ -268,7 +300,8 @@ test("daily runtime owns deterministic progression, persistence, and rollover", 
   assert.match(main, /renderCelebration\(session\.dailyComplete\)/);
   assert.match(main, /Come back in \$\{formatCountdown/);
   assert.match(main, /shareResultButton\.addEventListener\("click", shareDailyResult\)/);
-  assert.match(main, /I've completed today's Twain in \$\{formatElapsed/);
+  assert.match(main, /formatDailyResultShareText\(\{/);
+  assert.match(main, /hints:\s*session\.hints/);
   assert.match(main, /helpButton\.addEventListener\("click", openHowTo\)/);
   assert.match(main, /howToDialog\.showModal\(\)/);
   assert.match(main, /clearButton\.addEventListener\("click", clearCurrentPuzzle\)/);
@@ -289,7 +322,15 @@ test("compact chrome keeps accessible status and mobile gesture policy", async (
     /<header class="site-header">[\s\S]*?<span>Twain<\/span>[\s\S]*?<p class="header-date" id="dailyDate"[\s\S]*?id="helpButton"[\s\S]*?id="shareButton"[\s\S]*?<\/header>/,
   );
   assert.match(html, /aria-haspopup="dialog"[\s\S]*aria-controls="howToDialog"/);
+  assert.match(
+    html,
+    /id="shareButton"[\s\S]*aria-haspopup="dialog"[\s\S]*aria-controls="headerShareDialog"/,
+  );
   assert.match(html, /id="closeHowToButton"/);
+  assert.match(
+    html,
+    /id="headerShareDialog"[\s\S]*id="headerShareQr"[\s\S]*id="headerShareUrl"[\s\S]*id="copyHeaderShareButton"/,
+  );
   assert.match(html, /id="shareFallbackDialog"[\s\S]*id="shareFallbackText"/);
   assert.match(html, /id="copyShareFallbackButton"/);
   assert.match(html, /id="shareFeedback"[\s\S]*role="status"/);
@@ -311,6 +352,10 @@ test("compact chrome keeps accessible status and mobile gesture policy", async (
   assert.match(
     styles,
     /\.share-fallback-text\s*{[^}]*-webkit-touch-callout:\s*default;[^}]*user-select:\s*text;/s,
+  );
+  assert.match(
+    styles,
+    /\.header-share-url\s*{[^}]*-webkit-touch-callout:\s*default;[^}]*user-select:\s*text;/s,
   );
   assert.match(styles, /\.share-feedback\s*{[^}]*position:\s*fixed;/s);
 });

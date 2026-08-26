@@ -5,11 +5,13 @@ import {
   DAILY_RUN_VERSION,
   DAILY_STORAGE_KEY,
   DIFFICULTY_CATALOG,
+  FIRST_TWAIN_DATE_KEY,
   MAX_DAILY_STAGES,
   MIN_DAILY_STAGES,
   dailyDifficultyAt,
   dailySchedule,
   dailyStageSeed,
+  dailyTwainNumber,
   millisecondsUntilNextTaiwanDay,
   taiwanDateKey,
 } from "../src/daily.js";
@@ -34,6 +36,19 @@ test("Taiwan daily dates roll over at 16:00 UTC", () => {
       new Date("2026-08-25T16:00:00.000Z"),
     ),
     24 * 60 * 60 * 1000,
+  );
+});
+
+test("daily Twain numbers begin at one on 2026-08-26 and advance by calendar day", () => {
+  assert.equal(FIRST_TWAIN_DATE_KEY, "2026-08-26");
+  assert.equal(dailyTwainNumber("2026-08-25"), null);
+  assert.equal(dailyTwainNumber("2026-08-26"), 1);
+  assert.equal(dailyTwainNumber("2026-08-27"), 2);
+  assert.equal(dailyTwainNumber("2026-08-31"), 6);
+  assert.equal(dailyTwainNumber("2026-09-01"), 7);
+  assert.equal(
+    dailyTwainNumber("2028-02-29"),
+    dailyTwainNumber("2028-02-28") + 1,
   );
 });
 
@@ -89,6 +104,7 @@ test("daily helpers reject malformed dates, stages, and clocks", () => {
   assert.throws(() => taiwanDateKey(Number.NaN), TypeError);
   assert.throws(() => millisecondsUntilNextTaiwanDay(Number.NaN), TypeError);
   assert.throws(() => dailyStageSeed("2026-02-30", "easy"), RangeError);
+  assert.throws(() => dailyTwainNumber("2026-02-30"), RangeError);
   assert.throws(() => dailyStageSeed("2026-08-25", "impossible"), RangeError);
   assert.throws(() => dailySchedule("2026-02-30"), RangeError);
   assert.throws(() => dailyDifficultyAt("2026-08-25", -1), RangeError);

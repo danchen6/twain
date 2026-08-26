@@ -108,7 +108,7 @@ button:disabled {
 
 .header-date {
   margin: 0;
-  color: var(--theme-accent);
+  color: var(--ink);
   font-size: 1rem;
   font-variant-numeric: tabular-nums;
   font-weight: 760;
@@ -660,6 +660,7 @@ button:disabled {
 }
 
 .how-to-dialog,
+.header-share-dialog,
 .share-fallback-dialog {
   width: min(calc(100% - 32px), 640px);
   max-width: none;
@@ -673,11 +674,13 @@ button:disabled {
 }
 
 .how-to-dialog[open],
+.header-share-dialog[open],
 .share-fallback-dialog[open] {
   animation: tutorial-pop 180ms ease-out both;
 }
 
 .how-to-dialog::backdrop,
+.header-share-dialog::backdrop,
 .share-fallback-dialog::backdrop {
   background: rgb(25 25 25 / 42%);
   backdrop-filter: blur(2px);
@@ -685,6 +688,7 @@ button:disabled {
 }
 
 .how-to-panel,
+.header-share-panel,
 .share-fallback-panel {
   max-height: calc(100svh - 32px);
   overflow: auto;
@@ -696,6 +700,7 @@ button:disabled {
 }
 
 .how-to-header,
+.header-share-header,
 .share-fallback-header {
   display: flex;
   align-items: center;
@@ -705,6 +710,7 @@ button:disabled {
 }
 
 .how-to-header h2,
+.header-share-header h2,
 .share-fallback-header h2 {
   margin: 0;
   font-family: Georgia, "Times New Roman", serif;
@@ -715,6 +721,68 @@ button:disabled {
 
 .dialog-close {
   flex: 0 0 auto;
+}
+
+.header-share-dialog {
+  width: min(calc(100% - 32px), 430px);
+}
+
+.header-share-panel > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.header-share-qr {
+  width: min(224px, 100%);
+  aspect-ratio: 1;
+  margin: 18px auto 20px;
+  overflow: hidden;
+  border: 1px solid rgb(25 25 25 / 10%);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgb(25 25 25 / 8%);
+}
+
+.header-share-qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.header-share-url-label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 720;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.header-share-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.header-share-url {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  color: var(--ink);
+  background: #fbfaf8;
+  font: 500 0.8rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.header-share-copy-button {
+  white-space: nowrap;
 }
 
 .share-fallback-dialog {
@@ -1082,16 +1150,32 @@ kbd {
   }
 
   .how-to-dialog,
+  .header-share-dialog,
   .share-fallback-dialog {
     width: calc(100% - 16px);
     max-height: calc(100svh - 16px);
   }
 
   .how-to-panel,
+  .header-share-panel,
   .share-fallback-panel {
     max-height: calc(100svh - 16px);
   }
 
+  .header-share-qr {
+    width: min(216px, 100%);
+  }
+
+}
+
+@media (max-width: 360px) {
+  .header-share-link-row {
+    grid-template-columns: 1fr;
+  }
+
+  .header-share-copy-button {
+    width: 100%;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

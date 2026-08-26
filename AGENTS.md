@@ -27,6 +27,7 @@ Do not add a framework, package dependency, transpiler, bundler, runtime server,
 - Twain completion requires two orthogonal, non-repeating, cell-disjoint lines. Each visits its own clues in ascending order and ends at its final clue; together they occupy every cell without crossing a wall.
 - Witness line lengths prove solvability but are not player quotas. Any valid full-board partition must be accepted.
 - Every Taiwan calendar date (GMT+8) deterministically samples and shuffles three to five unique daily stages from Easy, Medium, Hard, Extra, and Ultra. The schedule, stage seeds, and generated boards must be identical across browsers running the same deployed code.
+- Public daily numbering is launch-relative and independent of generation versions: Taiwan date 2026-08-26 is Twain #1, and every later Taiwan calendar date increments the number by one.
 - Seeded generation is deterministic. Changing output for an existing `(version, difficulty, seed)` requires a deliberate format-version decision; changing the daily date-to-seed contract requires a daily-run version decision.
 - UI input paths (pointer, tap, and keyboard) must call the same pure rule functions in `src/game.js`.
 - Third-party trademarks, logos, proprietary assets, and copied boards must not enter the repository. All gameplay assets and daily boards must be independently created.
