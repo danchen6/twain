@@ -13,6 +13,8 @@ const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(SCRIPT_DIRECTORY, "../../../..");
 const FIXED_DATE_KEY = "2026-08-29";
 const FIXED_NOW = Date.parse("2026-08-29T08:00:00.000Z");
+const SOCIAL_ART_DATE_KEY = "2026-08-12";
+const SOCIAL_ART_NOW = Date.parse("2026-08-12T08:00:00.000Z");
 const COMMAND_TIMEOUT = 15_000;
 
 function delay(milliseconds) {
@@ -287,7 +289,9 @@ function keyDefinition(key) {
     ArrowUp: { code: "ArrowUp", virtualKey: 38 },
     Backspace: { code: "Backspace", virtualKey: 8 },
     Enter: { code: "Enter", virtualKey: 13 },
+    End: { code: "End", virtualKey: 35 },
     Escape: { code: "Escape", virtualKey: 27 },
+    Home: { code: "Home", virtualKey: 36 },
     Tab: { code: "Tab", virtualKey: 9 },
     h: { code: "KeyH", virtualKey: 72 },
     l: { code: "KeyL", virtualKey: 76 },
@@ -310,6 +314,7 @@ async function main() {
   const screenshots = [];
   const checks = [];
   const pageErrors = [];
+  const analyticsRequests = [];
   let serverProcess = null;
   let browserProcess = null;
 
@@ -381,7 +386,12 @@ async function main() {
       {
         source: `(() => {
           const NativeDate = Date;
-          globalThis.__twainVisualNow = ${FIXED_NOW};
+          const requestedNow = new URLSearchParams(globalThis.location.search).get('qaNow');
+          const requestedConsent = new URLSearchParams(globalThis.location.search).get('qaConsent');
+          const parsedNow = Number(requestedNow);
+          globalThis.__twainVisualNow = requestedNow !== null && Number.isFinite(parsedNow)
+            ? parsedNow
+            : ${FIXED_NOW};
           class FixedDate extends NativeDate {
             constructor(...args) {
               super(...(args.length === 0 ? [globalThis.__twainVisualNow] : args));
@@ -391,6 +401,19 @@ async function main() {
             }
           }
           globalThis.Date = FixedDate;
+          try {
+            if (requestedConsent === 'granted' || requestedConsent === 'denied') {
+              localStorage.setItem('twain:analytics-consent:v1', JSON.stringify({
+                version: 1,
+                state: requestedConsent,
+                updatedAt: new NativeDate(globalThis.__twainVisualNow).toISOString(),
+              }));
+            } else if (requestedConsent === 'unset') {
+              localStorage.removeItem('twain:analytics-consent:v1');
+            }
+          } catch {
+            // about:blank and locked-down contexts may not expose localStorage.
+          }
         })();`,
       },
       sessionId,
@@ -414,6 +437,13 @@ async function main() {
         message.params?.entry?.level === "error"
       ) {
         pageErrors.push(message.params.entry.text);
+      }
+
+      if (message.method === "Network.requestWillBeSent") {
+        const url = message.params?.request?.url ?? "";
+        if (/google-analytics\.com|googletagmanager\.com/.test(url)) {
+          analyticsRequests.push(url);
+        }
       }
     });
 
@@ -492,6 +522,8 @@ async function main() {
       reduced = false,
       fresh = true,
       query = "",
+      now = FIXED_NOW,
+      consent = "denied",
     }) => {
       await configureViewport({ width, height, mobile, reduced });
 
@@ -510,6 +542,8 @@ async function main() {
       navigationSequence += 1;
       const parameters = new URLSearchParams(query);
       parameters.set("qa", String(navigationSequence));
+      parameters.set("qaNow", String(now));
+      parameters.set("qaConsent", consent);
       await navigate(`${baseUrl}?${parameters}`);
 
       for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -605,8 +639,17 @@ async function main() {
         const helpButtonStyle = getComputedStyle(helpButton);
         const helpButtonRect = helpButton.getBoundingClientRect();
         const timerIcon = document.querySelector('#dailyTimer svg');
+        const storedJson = (key) => {
+          try {
+            const value = localStorage.getItem(key);
+            return value === null ? null : JSON.parse(value);
+          } catch {
+            return null;
+          }
+        };
         return {
           activeElement: document.activeElement?.id || document.activeElement?.className || document.activeElement?.tagName,
+          activeLanguageOption: document.activeElement?.dataset?.locale ?? null,
           activeLine: board.dataset.activeLine,
           boardAnimationName: getComputedStyle(board).animationName,
           brandMarkLoaded: brandMark.complete && brandMark.naturalWidth > 0,
@@ -614,6 +657,7 @@ async function main() {
           brandMarkSquare: Math.abs(brandMarkRect.width - brandMarkRect.height) < 0.5,
           brandTextVisible: getComputedStyle(brandText).display !== 'none' && brandText.getBoundingClientRect().width > 0,
           clearDisabled: document.querySelector('#clearButton').disabled,
+          clearLabel: document.querySelector('#clearButton').textContent.trim(),
           completionCountdown: document.querySelector('#completionCountdown').textContent.trim(),
           completionCountdownHidden: document.querySelector('#completionCountdown').hidden,
           completionHidden: document.querySelector('#completionOverlay').hidden,
@@ -630,6 +674,8 @@ async function main() {
           dailyProgressNow: document.querySelector('#dailyProgress').getAttribute('aria-valuenow'),
           dailySchedule: [...document.querySelectorAll('[data-daily-step]')].map((step) => step.title.toLowerCase()),
           difficulty: document.querySelector('#board').dataset.difficulty,
+          documentLanguage: document.documentElement.lang,
+          documentTitle: document.title,
           difficultySelectorPresent: Boolean(document.querySelector('[data-difficulty]:not(#board)')),
           footerPresent: Boolean(document.querySelector('footer')),
           headerDateColor: headerDateStyle.color,
@@ -640,6 +686,7 @@ async function main() {
           helpButtonColor: helpButtonStyle.color,
           helpButtonIsRound: helpButtonStyle.borderRadius === '50%' && Math.abs(helpButtonRect.width - helpButtonRect.height) < 0.5,
           helpDialogOpen: document.querySelector('#howToDialog').open,
+          howToTitle: document.querySelector('#howToTitle').textContent.trim(),
           headerShareCopyLabel: document.querySelector('#copyHeaderShareButton').textContent.trim(),
           headerShareInstructions: document.querySelector('#headerShareInstructions').textContent.trim(),
           headerShareOpen: document.querySelector('#headerShareDialog').open,
@@ -651,10 +698,30 @@ async function main() {
           inlineHowToPresent: Boolean(document.querySelector('details.how-to')),
           introCopyPresent: Boolean(document.querySelector('#introCopy')),
           letterLineOpacity: letterLineClue ? getComputedStyle(letterLineClue).opacity : null,
+          languageButtonPresent: Boolean(document.querySelector('#languageButton')),
+          languageExpanded: document.querySelector('#languageButton').getAttribute('aria-expanded'),
+          languageMenuHidden: document.querySelector('#languageMenu').hidden,
+          languageMenuOptions: [...document.querySelectorAll('.language-option')].map((option) => ({
+            checked: option.getAttribute('aria-checked'),
+            label: option.querySelector('span:last-child').textContent.trim(),
+            locale: option.dataset.locale,
+          })),
+          languageOverride: localStorage.getItem('twain:locale:v1'),
           lineSelectorPresent: Boolean(document.querySelector('.line-selector')),
           modeSelectorPresent: Boolean(document.querySelector('[data-mode]')),
           newButtonPresent: Boolean(document.querySelector('#newBoardButton, #newPuzzleButton')),
           numberLineOpacity: numberLineClue ? getComputedStyle(numberLineClue).opacity : null,
+          analyticsConsent: storedJson('twain:analytics-consent:v1'),
+          analyticsDataLayerPresent: Array.isArray(window.dataLayer),
+          analyticsTagPresent: Boolean(document.querySelector('#twain-google-tag')),
+          privacyBannerCopy: document.querySelector('#privacyBannerCopy').textContent.trim(),
+          privacyBannerHidden: document.querySelector('#privacyBanner').hidden,
+          privacyBannerTitle: document.querySelector('#privacyBannerTitle').textContent.trim(),
+          privacyBodyClass: document.body.classList.contains('has-privacy-banner'),
+          privacyDialogOpen: document.querySelector('#privacyDialog').open,
+          privacyDialogTitle: document.querySelector('#privacyDialogTitle').textContent.trim(),
+          privacyPreferencesLabel: document.querySelector('#privacyPreferencesButton').textContent.trim(),
+          privacyStatus: document.querySelector('#privacyStatus').textContent.trim(),
           progress: \`\${occupied}/\${hits.length}\`,
           progressEyebrowPresent: Boolean(document.querySelector('.daily-progress-label')),
           puzzleMetaPresent: Boolean(document.querySelector('#puzzleMeta, .puzzle-meta')),
@@ -676,6 +743,7 @@ async function main() {
           status: document.querySelector('#liveAnnouncer').textContent,
           statusMessagePresent: Boolean(document.querySelector('#statusMessage')),
           statusPanelPresent: Boolean(document.querySelector('.status-panel')),
+          streak: storedJson('twain:streak:v1'),
           timer: document.querySelector('#timerValue').textContent,
           timerIconDisplay: getComputedStyle(timerIcon).display,
           timerLabel: document.querySelector('#dailyTimer').getAttribute('aria-label'),
@@ -701,11 +769,16 @@ async function main() {
           .filter((rect) => rect.left < -0.5 || rect.right > window.innerWidth + 0.5);
         const board = document.querySelector('#board').getBoundingClientRect();
         const headerDate = document.querySelector('#dailyDate');
+        const headerDateRect = headerDate.getBoundingClientRect();
         const headerDateStyle = getComputedStyle(headerDate);
+        const brand = document.querySelector('.brand').getBoundingClientRect();
         const brandMark = document.querySelector('.brand-mark');
         const brandMarkRect = brandMark.getBoundingClientRect();
         const brandText = document.querySelector('.brand > span:last-child');
         const helpButtonStyle = getComputedStyle(document.querySelector('#helpButton'));
+        const helpButton = document.querySelector('#helpButton').getBoundingClientRect();
+        const shareButton = document.querySelector('#shareButton').getBoundingClientRect();
+        const languageButton = document.querySelector('#languageButton').getBoundingClientRect();
         const timerIconDisplay = getComputedStyle(document.querySelector('#dailyTimer svg')).display;
         const timer = document.querySelector('#dailyTimer').getBoundingClientRect();
         const progress = document.querySelector('#dailyProgress').getBoundingClientRect();
@@ -742,6 +815,15 @@ async function main() {
           },
           helpButtonBackground: helpButtonStyle.backgroundColor,
           helpButtonColor: helpButtonStyle.color,
+          headerActions: {
+            help: { left: helpButton.left, right: helpButton.right },
+            share: { left: shareButton.left, right: shareButton.right },
+            language: { left: languageButton.left, right: languageButton.right },
+          },
+          headerContent: {
+            brand: { left: brand.left, right: brand.right },
+            date: { left: headerDateRect.left, right: headerDateRect.right },
+          },
           brandMarkLoaded: brandMark.complete && brandMark.naturalWidth > 0,
           brandMarkSource: brandMark.getAttribute('src'),
           brandMarkSquare: Math.abs(brandMarkRect.width - brandMarkRect.height) < 0.5,
@@ -753,13 +835,27 @@ async function main() {
             clear: { left: clear.left, right: clear.right },
           },
           title: document.title,
+          documentLanguage: document.documentElement.lang,
         };
       })()`);
 
-      assert.equal(layout.title, "Twain — Never the twain shall meet");
-      assert.equal(layout.headerDate, "#4 | Aug 29");
+      const localizedIdentity = {
+        en: { title: "Twain — Never the twain shall meet", date: "#4 | Aug 29" },
+        "zh-TW": { title: "Twain — 兩條路線，永不相交", date: "#4 | 8月29日" },
+        "zh-CN": { title: "Twain — 两条路线，永不相交", date: "#4 | 8月29日" },
+        ja: { title: "Twain — 2本のラインは交わらない", date: "#4 | 8月29日" },
+        ko: { title: "Twain — 두 선은 만나지 않습니다", date: "#4 | 8월 29일" },
+        es: { title: "Twain — Dos líneas que nunca se encuentran", date: "#4 | 29 ago" },
+        "pt-BR": { title: "Twain — Duas linhas que nunca se encontram", date: "#4 | 29 de ago." },
+      }[layout.documentLanguage];
+      assert.ok(localizedIdentity, `${label} has an unsupported document language`);
+      assert.equal(layout.title, localizedIdentity.title);
+      assert.equal(layout.headerDate, localizedIdentity.date);
       assert.doesNotMatch(layout.headerDate, /GMT|UTC/);
-      assert.equal(layout.headerDateStyle.fontSize, "16px");
+      assert.equal(
+        layout.headerDateStyle.fontSize,
+        layout.innerWidth <= 360 ? "14px" : "16px",
+      );
       assert.equal(layout.headerDateStyle.fontStyle, "normal");
       assert.equal(layout.headerDateStyle.fontWeight, "760");
       assert.equal(layout.headerDateStyle.letterSpacing, "normal");
@@ -770,6 +866,17 @@ async function main() {
       assert.equal(layout.helpButtonBackground, "rgb(25, 25, 25)");
       assert.equal(layout.helpButtonColor, "rgb(255, 255, 255)");
       assert.notEqual(layout.timerIconDisplay, "none");
+      assert.ok(
+        layout.headerActions.help.right <= layout.headerActions.share.left + 0.5 &&
+          layout.headerActions.share.right <= layout.headerActions.language.left + 0.5 &&
+          layout.headerActions.language.right <= layout.innerWidth + 0.5,
+        `${label} does not keep Help, Share, Language in order: ${JSON.stringify(layout.headerActions)}`,
+      );
+      assert.ok(
+        layout.headerContent.brand.right <= layout.headerContent.date.left + 0.5 &&
+          layout.headerContent.date.right <= layout.headerActions.help.left + 0.5,
+        `${label} has overlapping header content: ${JSON.stringify({ ...layout.headerContent, actions: layout.headerActions })}`,
+      );
 
       assert.equal(layout.headerDateStyle.color, "rgb(25, 25, 25)");
       assert.ok(
@@ -829,12 +936,12 @@ async function main() {
       );
     };
 
-    const puzzle = async (stageIndex = 0) =>
+    const puzzle = async (stageIndex = 0, dateKey = FIXED_DATE_KEY) =>
       evaluate(`(async () => {
         const { generatePuzzle } = await import('./src/generator.js');
         const { dailyDifficultyAt, dailyStageSeed } = await import('./src/daily.js');
-        const difficulty = dailyDifficultyAt(${JSON.stringify(FIXED_DATE_KEY)}, ${stageIndex});
-        return generatePuzzle(difficulty, { seed: dailyStageSeed(${JSON.stringify(FIXED_DATE_KEY)}, difficulty) });
+        const difficulty = dailyDifficultyAt(${JSON.stringify(dateKey)}, ${stageIndex});
+        return generatePuzzle(difficulty, { seed: dailyStageSeed(${JSON.stringify(dateKey)}, difficulty) });
       })()`);
 
     const cellPoint = async (cell, currentPuzzle) => {
@@ -993,13 +1100,259 @@ async function main() {
         walls: [...document.querySelectorAll('.wall-line')].map((wall) => ['x1', 'y1', 'x2', 'y2'].map((name) => wall.getAttribute(name))),
       })`);
 
+    const privacyViewports = [
+      { width: 1440, height: 1000, mobile: false },
+      { width: 768, height: 1024, mobile: false },
+      { width: 390, height: 844, mobile: true },
+      { width: 320, height: 800, mobile: true },
+    ];
+
+    for (const viewport of privacyViewports) {
+      await loadViewport({ ...viewport, consent: "unset" });
+      const privacyState = await state();
+      assert.equal(privacyState.privacyBannerHidden, false);
+      assert.equal(privacyState.privacyBodyClass, true);
+      assert.equal(privacyState.privacyBannerTitle, "Privacy & analytics");
+      assert.match(privacyState.privacyBannerCopy, /stays off until you allow it/);
+      assert.equal(privacyState.analyticsConsent, null);
+      assert.equal(privacyState.analyticsTagPresent, false);
+      assert.equal(privacyState.analyticsDataLayerPresent, false);
+      const privacyLayout = await evaluate(`(() => {
+        const bounds = (element) => {
+          const rect = element.getBoundingClientRect();
+          return { bottom: rect.bottom, left: rect.left, right: rect.right, top: rect.top };
+        };
+        return {
+          accept: bounds(document.querySelector('#bannerAcceptButton')),
+          banner: bounds(document.querySelector('#privacyBanner')),
+          decline: bounds(document.querySelector('#bannerDeclineButton')),
+          documentWidth: document.documentElement.scrollWidth,
+          innerHeight: window.innerHeight,
+          innerWidth: window.innerWidth,
+        };
+      })()`);
+      assert.ok(Math.abs(privacyLayout.banner.bottom - privacyLayout.innerHeight) < 1);
+      assert.ok(privacyLayout.banner.left >= -0.5);
+      assert.ok(privacyLayout.banner.right <= privacyLayout.innerWidth + 0.5);
+      assert.ok(privacyLayout.documentWidth <= privacyLayout.innerWidth);
+      for (const action of [privacyLayout.decline, privacyLayout.accept]) {
+        assert.ok(action.left >= privacyLayout.banner.left - 0.5);
+        assert.ok(action.right <= privacyLayout.banner.right + 0.5);
+        assert.ok(action.top >= privacyLayout.banner.top - 0.5);
+        assert.ok(action.bottom <= privacyLayout.banner.bottom + 0.5);
+      }
+      if (viewport.width <= 360) {
+        assert.ok(privacyLayout.accept.top >= privacyLayout.decline.bottom - 0.5);
+      } else {
+        assert.ok(privacyLayout.decline.right <= privacyLayout.accept.left + 0.5);
+      }
+      await capture(`${viewport.width}x${viewport.height}-privacy-banner`);
+    }
+
+    await loadViewport({
+      width: 390,
+      height: 844,
+      mobile: true,
+      consent: "unset",
+    });
+    await clickSelector("#privacyDetailsButton");
+    await delay(180);
+    let privacyState = await state();
+    assert.equal(privacyState.privacyDialogOpen, true);
+    assert.equal(privacyState.privacyDialogTitle, "Privacy & analytics");
+    assert.equal(privacyState.privacyStatus, "Current choice: not selected.");
+    assert.equal(privacyState.activeElement, "closePrivacyButton");
+    const privacyDialogLayout = await evaluate(`(() => {
+      const rect = document.querySelector('.privacy-panel').getBoundingClientRect();
+      return { bottom: rect.bottom, left: rect.left, right: rect.right, top: rect.top };
+    })()`);
+    assert.ok(privacyDialogLayout.left >= 0 && privacyDialogLayout.right <= 390);
+    assert.ok(privacyDialogLayout.top >= 0 && privacyDialogLayout.bottom <= 844);
+    await capture("390x844-privacy-dialog");
+    await clickSelector("#closePrivacyButton");
+    await delay(30);
+    assert.equal((await state()).activeElement, "privacyDetailsButton");
+    await clickSelector("#bannerDeclineButton");
+    privacyState = await state();
+    assert.equal(privacyState.privacyBannerHidden, true);
+    assert.equal(privacyState.privacyBodyClass, false);
+    assert.equal(privacyState.analyticsConsent.state, "denied");
+    assert.equal(privacyState.analyticsConsent.version, 1);
+    assert.equal(privacyState.analyticsTagPresent, false);
+    assert.equal(privacyState.analyticsDataLayerPresent, false);
+
+    await loadViewport({
+      width: 390,
+      height: 844,
+      mobile: true,
+      fresh: false,
+      consent: "preserve",
+    });
+    privacyState = await state();
+    assert.equal(privacyState.privacyBannerHidden, true);
+    assert.equal(privacyState.analyticsConsent.state, "denied");
+    await clickSelector("#helpButton");
+    assert.equal((await state()).privacyPreferencesLabel, "Privacy choices");
+    await clickSelector("#privacyPreferencesButton");
+    privacyState = await state();
+    assert.equal(privacyState.helpDialogOpen, false);
+    assert.equal(privacyState.privacyDialogOpen, true);
+    assert.equal(privacyState.privacyStatus, "Current choice: analytics declined.");
+    await clickSelector("#privacyAcceptButton");
+    await delay(30);
+    privacyState = await state();
+    assert.equal(privacyState.privacyDialogOpen, false);
+    assert.equal(privacyState.analyticsConsent.state, "granted");
+    assert.equal(privacyState.analyticsTagPresent, false);
+    assert.equal(privacyState.analyticsDataLayerPresent, false);
+    assert.equal(privacyState.activeElement, "helpButton");
+
+    await loadViewport({
+      width: 390,
+      height: 844,
+      mobile: true,
+      fresh: false,
+      consent: "preserve",
+    });
+    assert.equal((await state()).analyticsConsent.state, "granted");
+    assert.deepEqual(analyticsRequests, []);
+    checks.push(
+      "privacy banner and details fit all maintained viewports; decline/grant persist, Help reopens choices, and disabled analytics creates no Google tag or request",
+    );
+
+    await loadViewport({
+      width: 1440,
+      height: 1000,
+      now: SOCIAL_ART_NOW,
+    });
+    const socialArtPuzzle = await puzzle(0, SOCIAL_ART_DATE_KEY);
+    assert.equal((await state()).difficulty, "easy");
+    const nearCompletePaths = socialArtPuzzle.lines.map((line) =>
+      line.solution.slice(0, -1),
+    );
+    for (const path of nearCompletePaths) {
+      await mouseDragCells(path, socialArtPuzzle);
+    }
+    let currentState = await state();
+    assert.equal(currentState.progress, "23/25");
+    assert.equal(currentState.completionHidden, true);
+    assert.deepEqual(
+      await evaluate(`[
+        document.querySelector('[data-route-line="a"]').getAttribute('points').trim().split(/\\s+/).length,
+        document.querySelector('[data-route-line="b"]').getAttribute('points').trim().split(/\\s+/).length,
+      ]`),
+      [14, 9],
+    );
+    await capture("1440x1000-og-near-complete", {
+      centerSelector: "#board",
+    });
+    checks.push(
+      "the social-art source uses a pre-launch board and captures both real witness paths one move from their final clues without revealing completion",
+    );
+
     await loadViewport({
       width: 1440,
       height: 1000,
       query: "difficulty=ultra&seed=ignored",
     });
     await assertLayout("1440x1000 daily Easy fresh");
-    let currentState = await state();
+    currentState = await state();
+    assert.equal(currentState.streak, null);
+    const installMetadata = await evaluate(`(async () => {
+      const inspectImage = (src) => new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 40;
+          canvas.height = 21;
+          const context = canvas.getContext('2d', { willReadFrequently: true });
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+          const colorBuckets = new Set();
+          let darkPixels = 0;
+          for (let index = 0; index < pixels.length; index += 4) {
+            const red = pixels[index];
+            const green = pixels[index + 1];
+            const blue = pixels[index + 2];
+            colorBuckets.add([red >> 4, green >> 4, blue >> 4].join(','));
+            if ((red * 299 + green * 587 + blue * 114) / 1000 < 128) {
+              darkPixels += 1;
+            }
+          }
+          resolve({
+            darkPixels,
+            height: image.naturalHeight,
+            sampledColorBuckets: colorBuckets.size,
+            src: image.currentSrc,
+            width: image.naturalWidth,
+          });
+        };
+        image.onerror = () => reject(new Error(\`Unable to load \${src}\`));
+        image.src = src;
+      });
+      const manifestUrl = document.querySelector('link[rel="manifest"]').href;
+      const manifestResponse = await fetch(manifestUrl);
+      const manifest = await manifestResponse.json();
+      const manifestIcons = await Promise.all(
+        manifest.icons.map(async (icon) => ({
+          ...icon,
+          image: await inspectImage(new URL(icon.src, manifestUrl).href),
+        })),
+      );
+      return {
+        appleIcon: await inspectImage(document.querySelector('link[rel="apple-touch-icon"]').href),
+        appleTitle: document.querySelector('meta[name="apple-mobile-web-app-title"]').content,
+        canonical: document.querySelector('link[rel="canonical"]').href,
+        manifest: {
+          contentType: manifestResponse.headers.get('content-type'),
+          display: manifest.display,
+          icons: manifestIcons,
+          ok: manifestResponse.ok,
+          shortName: manifest.short_name,
+          startUrl: manifest.start_url,
+        },
+        ogImage: await inspectImage('./assets/social/twain-og-v2.png'),
+        ogImageMeta: document.querySelector('meta[property="og:image"]').content,
+        twitterCard: document.querySelector('meta[name="twitter:card"]').content,
+      };
+    })()`);
+    assert.equal(installMetadata.canonical, "https://danchen6.github.io/twain/");
+    assert.equal(installMetadata.appleTitle, "Twain");
+    assert.deepEqual(
+      { width: installMetadata.appleIcon.width, height: installMetadata.appleIcon.height },
+      { width: 180, height: 180 },
+    );
+    assert.equal(installMetadata.manifest.ok, true);
+    assert.match(installMetadata.manifest.contentType, /(?:manifest|json)/);
+    assert.equal(installMetadata.manifest.display, "standalone");
+    assert.equal(installMetadata.manifest.shortName, "Twain");
+    assert.equal(installMetadata.manifest.startUrl, "./");
+    assert.deepEqual(
+      installMetadata.manifest.icons.map(({ sizes, purpose, image }) => ({
+        sizes,
+        purpose,
+        width: image.width,
+        height: image.height,
+      })),
+      [
+        { sizes: "192x192", purpose: "any maskable", width: 192, height: 192 },
+        { sizes: "512x512", purpose: "any maskable", width: 512, height: 512 },
+      ],
+    );
+    assert.deepEqual(
+      { width: installMetadata.ogImage.width, height: installMetadata.ogImage.height },
+      { width: 1200, height: 630 },
+    );
+    assert.ok(installMetadata.ogImage.sampledColorBuckets >= 24);
+    assert.ok(installMetadata.ogImage.darkPixels >= 24);
+    assert.equal(
+      installMetadata.ogImageMeta,
+      "https://danchen6.github.io/twain/assets/social/twain-og-v2.png",
+    );
+    assert.equal(installMetadata.twitterCard, "summary_large_image");
+    checks.push(
+      "versioned nonblank OG art, canonical social metadata, Apple touch icon, and maskable standalone manifest assets load under the nested Pages path",
+    );
     assert.equal(currentState.difficulty, "easy");
     assert.equal(currentState.progress, "0/25");
     assert.equal(currentState.dailyProgress, "0 complete; Easy, stage 1 of 5");
@@ -1083,6 +1436,182 @@ async function main() {
       "daily-only chrome, deterministic shuffled schedule, two-line Twain logo, black numbered header identity, canonical URL, distinct route hues, and Twain clue shapes/colors render correctly",
     );
     await capture("1440x1000-daily-easy-fresh", { fullPage: true });
+
+    assert.equal(currentState.languageButtonPresent, true);
+    assert.equal(currentState.documentLanguage, "en");
+    assert.equal(currentState.languageOverride, null);
+    assert.equal(currentState.languageMenuHidden, true);
+    assert.equal(currentState.languageExpanded, "false");
+    await clickSelector("#languageButton");
+    await delay(80);
+    currentState = await state();
+    assert.equal(currentState.languageMenuHidden, false);
+    assert.equal(currentState.languageExpanded, "true");
+    assert.equal(currentState.activeLanguageOption, "auto");
+    assert.deepEqual(
+      currentState.languageMenuOptions.map(({ locale }) => locale),
+      ["auto", "zh-TW", "en", "zh-CN", "ja", "ko", "es", "pt-BR"],
+    );
+    assert.equal(currentState.languageMenuOptions[0].label, "Automatic · English");
+    assert.equal(currentState.languageMenuOptions[0].checked, "true");
+    assert.equal(currentState.languageMenuOptions[1].label, "繁體中文");
+    assert.equal(currentState.languageMenuOptions[2].label, "English");
+    await capture("1440x1000-language-menu-en");
+    await dispatchKey("End");
+    assert.equal((await state()).activeLanguageOption, "pt-BR");
+    await dispatchKey("Home");
+    assert.equal((await state()).activeLanguageOption, "auto");
+    await dispatchKey("Escape");
+    currentState = await state();
+    assert.equal(currentState.languageMenuHidden, true);
+    assert.equal(currentState.activeElement, "languageButton");
+
+    await clickSelector("#languageButton");
+    await clickSelector('.language-option[data-locale="zh-TW"]');
+    currentState = await state();
+    assert.equal(currentState.documentLanguage, "zh-TW");
+    assert.equal(currentState.documentTitle, "Twain — 兩條路線，永不相交");
+    assert.equal(currentState.languageOverride, "zh-TW");
+    assert.equal(currentState.dailyDate, "#4 | 8月29日");
+    assert.equal(currentState.clearLabel, "清除");
+    assert.equal(currentState.howToTitle, "玩法");
+    assert.equal(currentState.privacyPreferencesLabel, "隱私設定");
+    assert.equal(currentState.shareResultLabel, "分享");
+    assert.equal(currentState.dailySchedule[0], "簡單");
+    assert.equal(
+      currentState.languageMenuOptions.find(({ locale }) => locale === "zh-TW").checked,
+      "true",
+    );
+    await loadViewport({ width: 1440, height: 1000, fresh: false });
+    currentState = await state();
+    assert.equal(currentState.documentLanguage, "zh-TW");
+    assert.equal(currentState.languageOverride, "zh-TW");
+    await configureViewport({ width: 390, height: 844, mobile: true });
+    await assertLayout("390x844 Traditional Chinese fresh");
+    await clickSelector("#helpButton");
+    await delay(250);
+    await capture("390x844-zh-tw-how-to-dialog");
+    await clickSelector("#closeHowToButton");
+    await clickSelector("#shareButton");
+    await delay(250);
+    currentState = await state();
+    assert.equal(currentState.headerShareTitle, "分享 Twain #4");
+    assert.equal(currentState.headerShareCopyLabel, "複製連結");
+    await capture("390x844-zh-tw-header-share-dialog");
+    await clickSelector("#closeHeaderShareButton");
+    await configureViewport({ width: 1440, height: 1000 });
+
+    const localeIntegrationChecks = [
+      { code: "zh-CN", clear: "清除", date: "#4 | 8月29日", howTo: "玩法", privacy: "隐私设置", share: "分享", stage: "简单" },
+      { code: "ja", clear: "クリア", date: "#4 | 8月29日", howTo: "遊び方", privacy: "プライバシー設定", share: "共有", stage: "かんたん" },
+      { code: "ko", clear: "지우기", date: "#4 | 8월 29일", howTo: "플레이 방법", privacy: "개인정보 설정", share: "공유", stage: "쉬움" },
+      { code: "es", clear: "Borrar", date: "#4 | 29 ago", howTo: "Cómo jugar", privacy: "Opciones de privacidad", share: "Compartir", stage: "fácil" },
+      { code: "pt-BR", clear: "Limpar", date: "#4 | 29 de ago.", howTo: "Como jogar", privacy: "Opções de privacidade", share: "Compartilhar", stage: "fácil" },
+    ];
+
+    for (const expectation of localeIntegrationChecks) {
+      await clickSelector("#languageButton");
+      await clickSelector(`.language-option[data-locale="${expectation.code}"]`);
+      currentState = await state();
+      assert.equal(currentState.documentLanguage, expectation.code);
+      assert.equal(currentState.languageOverride, expectation.code);
+      assert.equal(currentState.clearLabel, expectation.clear);
+      assert.equal(currentState.dailyDate, expectation.date);
+      assert.equal(currentState.howToTitle, expectation.howTo);
+      assert.equal(currentState.privacyPreferencesLabel, expectation.privacy);
+      assert.equal(currentState.shareResultLabel, expectation.share);
+      assert.equal(currentState.dailySchedule[0], expectation.stage);
+      assert.equal(
+        currentState.languageMenuOptions.find(({ locale }) => locale === expectation.code).checked,
+        "true",
+      );
+    }
+
+    await configureViewport({ width: 320, height: 800, mobile: true });
+    await assertLayout("320x800 Brazilian Portuguese fresh");
+    await capture("320x800-pt-br-fresh");
+    await loadViewport({
+      width: 320,
+      height: 800,
+      mobile: true,
+      fresh: false,
+      consent: "unset",
+    });
+    currentState = await state();
+    assert.equal(currentState.documentLanguage, "pt-BR");
+    assert.equal(currentState.privacyBannerHidden, false);
+    assert.equal(currentState.privacyBannerTitle, "Privacidade e análise");
+    assert.match(currentState.privacyBannerCopy, /permanece desativado/);
+    await capture("320x800-pt-br-privacy-banner");
+    await clickSelector("#bannerDeclineButton");
+    await clickSelector("#languageButton");
+    const languageMenuLayout = await evaluate(`(() => {
+      const menu = document.querySelector('#languageMenu').getBoundingClientRect();
+      const options = [...document.querySelectorAll('.language-option')].map((option) => {
+        const rect = option.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+      });
+      return { menu: { left: menu.left, right: menu.right, top: menu.top, bottom: menu.bottom }, options };
+    })()`);
+    assert.ok(languageMenuLayout.menu.left >= 0 && languageMenuLayout.menu.right <= 320);
+    assert.ok(languageMenuLayout.menu.top >= 0 && languageMenuLayout.menu.bottom <= 800);
+    assert.equal(
+      languageMenuLayout.options.every(
+        (option) =>
+          option.left >= languageMenuLayout.menu.left &&
+          option.right <= languageMenuLayout.menu.right &&
+          option.top >= languageMenuLayout.menu.top &&
+          option.bottom <= languageMenuLayout.menu.bottom,
+      ),
+      true,
+    );
+    await capture("320x800-language-menu-pt-br");
+    await dispatchKey("Escape");
+    await configureViewport({ width: 1440, height: 1000 });
+
+    await clickSelector("#languageButton");
+    await clickSelector('.language-option[data-locale="auto"]');
+    currentState = await state();
+    assert.equal(currentState.documentLanguage, "en");
+    assert.equal(currentState.languageOverride, null);
+    assert.equal(currentState.dailyDate, "#4 | Aug 29");
+    assert.equal(currentState.languageMenuOptions[0].checked, "true");
+
+    const browserLocaleScript = await cdp.call(
+      "Page.addScriptToEvaluateOnNewDocument",
+      {
+        source: `(() => {
+          Object.defineProperty(navigator, 'languages', {
+            configurable: true,
+            get: () => ['zh-Hant-TW', 'zh-TW'],
+          });
+          Object.defineProperty(navigator, 'language', {
+            configurable: true,
+            get: () => 'zh-Hant-TW',
+          });
+        })();`,
+      },
+      sessionId,
+    );
+    await loadViewport({ width: 390, height: 844, mobile: true });
+    currentState = await state();
+    assert.equal(currentState.documentLanguage, "zh-TW");
+    assert.equal(currentState.languageOverride, null);
+    assert.equal(currentState.languageMenuOptions[0].checked, "true");
+    assert.equal(currentState.languageMenuOptions[0].label, "自動 · 繁體中文");
+    await capture("390x844-auto-zh-tw-fresh");
+    await cdp.call(
+      "Page.removeScriptToEvaluateOnNewDocument",
+      { identifier: browserLocaleScript.identifier },
+      sessionId,
+    );
+    await loadViewport({ width: 1440, height: 1000 });
+    currentState = await state();
+    assert.equal(currentState.documentLanguage, "en");
+    assert.equal(currentState.languageOverride, null);
+    checks.push(
+      "rightmost Language menu supports keyboard navigation, seven localized UIs, browser-locale auto selection, and persisted explicit overrides",
+    );
 
     await clickSelector("#helpButton");
     await delay(250);
@@ -1490,6 +2019,7 @@ async function main() {
     assert.equal(currentState.continueHidden, false);
     assert.equal(currentState.continueLabel, "Next level");
     assert.equal(currentState.shareResultHidden, true);
+    assert.equal(currentState.streak, null);
     assert.match(currentState.timerLabel, /paused/);
     const overlayContract = await evaluate(`(() => {
       const board = document.querySelector('#board').getBoundingClientRect();
@@ -1692,7 +2222,15 @@ async function main() {
     assert.equal(currentState.hintDisabled, true);
     assert.equal(currentState.clearDisabled, true);
     assert.equal(currentState.undoDisabled, true);
+    assert.deepEqual(currentState.streak, {
+      version: 1,
+      currentStreak: 1,
+      longestStreak: 1,
+      totalCompletedDays: 1,
+      lastCompletedDate: FIXED_DATE_KEY,
+    });
     await loadViewport({ width: 1440, height: 1000, fresh: false });
+    assert.deepEqual((await state()).streak, currentState.streak);
     await delay(480);
     await seekConfetti(330);
     const dailyCompleteAnimation = await evaluate(`(() => {
@@ -1840,8 +2378,30 @@ async function main() {
     await clickSelector("#shareResultButton");
     await delay(50);
     assert.equal((await state()).shareFallbackOpen, false);
+
+    await clickSelector("#languageButton");
+    await clickSelector('.language-option[data-locale="zh-TW"]');
+    currentState = await state();
+    const localizedResultText = `我在 ${currentState.timer} 內完成了今天的 Twain #4，使用了 2 次提示。你能比我更快嗎？`;
+    await evaluate(`Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: () => Promise.reject(new DOMException('Native share rejected', 'NotAllowedError')),
+    })`);
+    await clickSelector("#shareResultButton");
+    await delay(220);
+    currentState = await state();
+    assert.equal(currentState.shareFallbackOpen, true);
+    assert.equal(currentState.shareFallbackText, `${localizedResultText} ${baseUrl}`);
+    await configureViewport({ width: 390, height: 844, mobile: true });
+    await assertLayout("390x844 Traditional Chinese result share fallback");
+    await capture("390x844-zh-tw-result-share-fallback");
+    await clickSelector("#closeShareFallbackButton");
+    await configureViewport({ width: 1440, height: 1000 });
+    await clickSelector("#languageButton");
+    await clickSelector('.language-option[data-locale="auto"]');
+    assert.equal((await state()).documentLanguage, "en");
     checks.push(
-      "result Share preserves direct activation, exposes a copy dialog after native failure, and leaves cancellation silent",
+      "result Share preserves direct activation, localizes numbered Hint-aware copy, exposes a copy dialog after native failure, and leaves cancellation silent",
     );
 
     await loadViewport({ width: 1440, height: 1000, fresh: false });
@@ -1871,7 +2431,7 @@ async function main() {
     assert.equal(currentState.completionHidden, true);
     assert.equal(currentState.timer, "00:00");
     checks.push(
-      "daily completion restores its result overlay, shares the numbered time and Hint count, counts down live, and rolls into the next numbered Taiwan day",
+      "only full daily completion records one idempotent local streak day; the result overlay restores, shares numbered time and Hint count, counts down live, and rolls into the next numbered Taiwan day",
     );
 
     await loadViewport({ width: 768, height: 1024 });
@@ -1962,6 +2522,7 @@ async function main() {
     );
     checks.push("keyboard focus reaches the board without a blue outer outline");
 
+    assert.deepEqual(analyticsRequests, [], "Disabled analytics made a Google request.");
     assert.deepEqual(pageErrors, [], `Browser errors: ${pageErrors.join("\n")}`);
     checks.push("no runtime or browser-console errors");
 
