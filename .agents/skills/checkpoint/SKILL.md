@@ -11,6 +11,8 @@ Nothing is complete until implementation, verification, and all four memory laye
 
 Inspect the working tree and distinguish this change from pre-existing user work. Do not absorb, overwrite, stage, or commit unrelated changes. Identify the product, architecture, design, model, interaction, and deployment surfaces affected.
 
+If the logical change modifies the shipped app surface—`index.html` other than its release literal, `styles.css`, `manifest.webmanifest`, `src/`, `assets/`, or `vendor/`—run `npm run release:bump` exactly once after the app source is final and before the gates. A version-only corrective revision may also use the command. Do not advance the app revision for documentation, tests, workflow, scripts, skills, or journals alone, and do not advance it again when retrying the same source revision. The CI base comparison is the final guard against a missing, stale, or duplicate transition.
+
 ## 2. Run the relevant gates
 
 Always run:

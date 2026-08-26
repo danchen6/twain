@@ -12,6 +12,8 @@ Provide one original three-to-five-stage puzzle run per Taiwan calendar date. A 
 
 Twain is an MIT-licensed public preview. The preview asserts the documented puzzle invariants and release gates, but it does not claim broad human difficulty calibration, full physical-device coverage, professional linguistic review of every locale, or stable-release readiness. Focused external contributions may be accepted; the roadmap and maintenance do not depend on them.
 
+The page footer identifies the checked-in app revision as `v{yymmdd}r{rev}`, for example `v260827r1`. `yymmdd` is the compact Taiwan date on which that source revision is finalized; the positive, unpadded `rev` begins at `1` each day and advances for each later app/runtime revision. A retry of the same source keeps its identifier, while an abandoned reserved revision may leave a gap. This release metadata is separate from package SemVer, puzzle format, daily-run, persistence, consent, and public Twain-number versions.
+
 ## Rules
 
 1. Draw the round Number line through `1, 2, 3…` and the square Letter line through `A, B, C…`.

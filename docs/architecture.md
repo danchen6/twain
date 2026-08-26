@@ -5,7 +5,7 @@
 The application is a no-build ES module site:
 
 ```text
-index.html
+index.html                static page shell and checked-in release footer
   -> assets/twain-mark.svg shared header and favicon brand mark
   -> manifest.webmanifest standalone launch contract and install icons
        -> assets/icons/    opaque Apple touch and maskable app icons
@@ -25,6 +25,7 @@ index.html
        -> src/i18n.js       locale catalog, matching, formatting, and UI messages
        -> src/share.js      pure localized Hint grammar and finished-result copy
 styles.css                  visual system and responsive layout
+scripts/                    pure release-version rules, bump command, and CI base guard
 ```
 
 `tests/` imports the same pure modules in Node. Browser-only APIs stay in `main.js`, so generation, daily contracts, persistence normalization, and game rules need no DOM shim.
@@ -84,6 +85,9 @@ Only the active stage is generated. This keeps initial rendering fast and moves 
 - `assets/social/`: versioned 1200×630 opaque OG PNGs, the real near-complete dual-path crop from a deterministic pre-launch board used inside the current card, its clean warm-paper raster, and an SVG composition source whose sparse neutral puzzle motifs, product UI, wordmark, and copy remain exact.
 - `manifest.webmanifest`: project-relative identity, launch scope, theme colors, standalone display, and `any maskable` app-icon declarations. It deliberately does not imply Service Worker or offline support.
 - `styles.css`: tokens, layout, component states, accessibility, breakpoints, and motion preferences.
+- `scripts/release-version.mjs`: pure parsing, formatting, Taiwan-date rollover, HTML-marker normalization, and base-to-current release-transition validation for the `v{yymmdd}r{rev}` app identifier.
+- `scripts/bump-release.mjs`: explicit dependency-free source update for the single release literal in `index.html`.
+- `scripts/check-release-version.mjs`: CI adapter that compares the checked-out app surface with a trusted Git base while ignoring the release literal itself. It requires every app change to advance the identifier, permits a version-only corrective revision, and leaves docs/tests/workflow-only changes unchanged.
 
 ## Persistence and trust boundary
 
@@ -118,6 +122,8 @@ Google Analytics is an optional external service rather than a package dependenc
 The public preview deployment target is the `danchen6/twain` GitHub Project Pages site at `https://danchen6.github.io/twain/`; no custom domain is configured. Runtime, manifest, and install-icon references are relative so the project path works without a configured base path. The canonical and Open Graph URLs are intentionally absolute production identifiers for crawlers; configuring a custom domain therefore requires updating those static URLs and versioning the social image filename to refresh crawler caches.
 
 `.github/workflows/pages.yml` runs the `Test` job for pull requests into `master`, pushes to `master`, and manual runs. `Deploy Pages` requires that job, has the only Pages and OIDC write permissions, and runs only for the `master` ref outside pull requests. It uploads the unchanged repository as a Pages artifact, preserving the no-build deployment contract. The repository's Pages source must be set to GitHub Actions once before the first deployment.
+
+App revisions are source-controlled rather than synthesized by Actions. After an app/runtime change is final, `npm run release:bump` advances the footer identifier using the fixed GMT+8 date helper: the same date increments the positive, unpadded revision, a later date resets it to `1`, and a future stored date fails. Pull-request and push tests fetch history and compare the current app surface with the event's base SHA; manual redeployment of the same `master` SHA does not consume another revision. The guarded release-bearing paths are `index.html` excluding the literal, `styles.css`, `manifest.webmanifest`, `src/`, `assets/`, and `vendor/`. The deployed artifact remains byte-for-byte repository source, and workflow permissions remain read-only for repository contents.
 
 ## Repository knowledge
 

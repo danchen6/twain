@@ -6,6 +6,7 @@
   "type": "module",
   "description": "Twain — Never the twain shall meet. A dependency-free daily two-line path puzzle.",
   "scripts": {
+    "release:bump": "node scripts/bump-release.mjs",
     "test": "node --test",
     "visual-qa": "node .agents/skills/visual-qa/scripts/run.mjs"
   },

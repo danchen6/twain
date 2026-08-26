@@ -40,6 +40,16 @@ npm run visual-qa
 
 The harness uses a locally installed Edge, Chrome, or Chromium browser, exercises the complete daily run and responsive interaction matrix, and writes screenshots to a temporary directory for inspection. Set `TWAIN_BROWSER_PATH` when the browser cannot be detected automatically.
 
+## Release revision
+
+The footer's checked-in app revision uses `v{yymmdd}r{rev}` (for example, `v260827r1`), based on the Taiwan date. After finishing an app/runtime change, advance it exactly once before the final tests:
+
+```sh
+npm run release:bump
+```
+
+The positive, unpadded revision increments on the same date; the first revision on a later Taiwan date resets to `1`. Documentation, test, workflow, and journal-only changes do not advance the app revision, and redeploying the same source retains it. Pull-request and push CI compare the identifier with the relevant base revision.
+
 ## Deploy
 
 Pull requests into `master` and pushes to `master` run the Node test suite. A successful push, or a manual workflow run from `master`, then deploys the unchanged static site to GitHub Pages.

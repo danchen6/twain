@@ -27,11 +27,12 @@ Coverage targets:
 - Static discovery tests enforce the canonical URL, required and structured Open Graph properties, matching large-card metadata, English crawler copy, standalone manifest contract, icon declarations, and exact opaque 1200×630/180×180/192×192/512×512 PNG dimensions.
 - The QR adapter deterministically produces square matrices, three intact finder patterns, a four-module quiet zone, and content-dependent SVG paths for the canonical URL.
 - Deterministic seed-to-palette selection with a maintained contrast floor.
+- Release-version tests lock the `v{yymmdd}r{rev}` grammar, valid compact calendar dates, positive unpadded revisions, GMT+8 rollover/reset behavior, one static HTML marker, and exact base-to-current transition rules. CI compares release-bearing app paths with the pull-request or pushed base SHA while permitting same-SHA manual redeployment.
 - Static deployment remains relative, daily-only, free of query-controlled puzzle selection, and free of package-manager/CDN dependencies; the pinned QR source/license remains present, and the optional remote Google tag must remain absent from static HTML and unreachable without valid configuration plus explicit consent.
 
 Tests use Node's built-in runner and remain network-independent.
 
-GitHub Actions runs the `Test` job for pull requests into and pushes to `master`. Only a successful non-pull-request run on `master` can start `Deploy Pages`; Pages and OIDC write permissions belong only to that deployment job. Rendered Visual QA remains a maintainer release gate rather than an automated pull-request check until browser provisioning is committed in CI.
+GitHub Actions runs the `Test` job for pull requests into and pushes to `master`, using full history to validate the checked-in app revision against the event's base SHA after the network-independent tests pass. Manual runs reuse the identifier already attached to that source. Only a successful non-pull-request run on `master` can start `Deploy Pages`; Pages and OIDC write permissions belong only to that deployment job. Rendered Visual QA remains a maintainer release gate rather than an automated pull-request check until browser provisioning is committed in CI.
 
 ## Rendered Visual QA
 
@@ -41,6 +42,7 @@ It verifies:
 
 - the versioned OG image, its real pre-launch 23-of-25-cell dual-path source state, canonical social metadata, Apple touch icon, and both maskable manifest icons load at their exact dimensions through the nested Pages path; the near-complete board stops both routes before their final clues, sampled OG pixels prove the raster is nonblank, and the manifest parses with standalone display and relative launch state;
 - canonical date-driven URL, deterministic same-date DOM board, numbered header identity, and next-day number rollover;
+- one correctly formatted, subtle release footer below the game card without horizontal overflow, card overlap, privacy-bar collision, or loss of the board's above-fold guarantee;
 - all five profiles in a noncanonical shuffled schedule, lazy transitions, dynamic progress segments, shared timer pause/resume, current-board Clear, final daily restore, live countdown, and automatic zero-boundary rollover;
 - pointer, touch, keyboard, line selection/fading, orthogonal click drawing, direct click rewind with one-action Undo, cell-by-cell tail-first drag backtracking, quiet non-predecessor body collisions during drag, still-board invalid input, Hint, and both Share entries: an in-app numbered header dialog whose canonical URL matches its black-on-white QR, Hint-aware finished-result payload, result-only direct transient activation, `canShare()` preflight, native Promise/non-Promise/rejection/cancellation behavior, secure Clipboard, insecure-context selected-text copy, visible copied feedback, and manual-copy fallback;
 - rightmost globe placement, Automatic plus seven locale autonyms, radio/keyboard menu behavior, browser-locale auto selection, explicit override persistence/reload/removal, all seven integrated UI locales, localized Traditional Chinese tutorial/Share dialogs, and 320px Brazilian Portuguese long-copy containment;
@@ -62,7 +64,7 @@ The harness produces screenshots and assertions; it does not judge pixels. Open 
 | Privacy/analytics | undecided state, persistent grant, session-only decline and next-session re-prompt, no pre-consent or declined tag request, Enhanced Measurement disclosure, withdrawal path, clean reload after active revocation, GA DebugView and account-setting validation before considering the rollout complete |
 | Discovery/install | inspect the 1200×630 social card and 180px Home Screen icon; verify OG/Twitter fields, manifest parse, nested-path asset loads, icon masking, Add to Home Screen name, and standalone launch on a physical device |
 | Daily lifecycle | same-date deterministic schedule/boards, 3–5 unique shuffled levels, sequential unlock within that schedule, pause between stages, reload restore paused, final result restore/share/countdown, new date on reload/visibility/countdown zero |
-| Responsive | maintained four viewports; Easy and Ultra square/above-fold; multi-glyph clue containment and optical alignment |
+| Responsive | maintained four viewports; Easy and Ultra square/above-fold; multi-glyph clue containment and optical alignment; quiet release footer below play without overlap |
 | Preferences | reduced motion and high-contrast control focus |
 | Deployment | nested GitHub Pages path loads every imported module |
 
@@ -74,6 +76,7 @@ The harness proves that header Share does not call `navigator.share()`, that its
 - `npm run visual-qa` passes and every relevant screenshot is inspected, or the journal names the precise rendered-browser gap.
 - A local HTTP server returns `index.html`, `manifest.webmanifest`, discovery/install images, `styles.css`, every imported module, and the pinned QR encoder.
 - Generated puzzles log no validator, runtime, or browser-console errors.
+- Every completed app/runtime revision has advanced the checked-in footer identifier exactly once; same-source retries and non-app changes retain it.
 - Semantic docs, backlog, procedure, and exactly one new journal agree with the implementation.
 
 ## Current automation gap

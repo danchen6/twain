@@ -20,6 +20,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
         with:
+          fetch-depth: 0
           persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -28,6 +29,12 @@ jobs:
           package-manager-cache: false
       - name: Test puzzle rules
         run: npm test
+      - name: Check release revision against pull request base
+        if: ${{ github.event_name == 'pull_request' }}
+        run: node scripts/check-release-version.mjs "${{ github.event.pull_request.base.sha }}"
+      - name: Check release revision against pushed base
+        if: ${{ github.event_name == 'push' }}
+        run: node scripts/check-release-version.mjs "${{ github.event.before }}"
 
   deploy:
     name: Deploy Pages

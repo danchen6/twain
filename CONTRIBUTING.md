@@ -24,6 +24,14 @@ Run the network-independent test suite:
 npm test
 ```
 
+If the contribution changes `index.html`, `styles.css`, `manifest.webmanifest`, or shipped files under `src/`, `assets/`, or `vendor/`, advance the checked-in app revision exactly once after the source is final and before running the final checks:
+
+```sh
+npm run release:bump
+```
+
+Do not advance it for documentation, tests, workflow, or journal-only changes. CI verifies the Taiwan-date `v{yymmdd}r{rev}` transition against the pull request base.
+
 For any user-visible change, also run the rendered browser matrix and inspect its temporary screenshots:
 
 ```sh

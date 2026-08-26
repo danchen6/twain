@@ -28,7 +28,11 @@ test("static entry point references relative, present assets", async () => {
 });
 
 test("Pages workflow tests pull requests and gates deployment on master", async () => {
-  const workflow = await source(".github/workflows/pages.yml");
+  const [workflow, packageSource] = await Promise.all([
+    source(".github/workflows/pages.yml"),
+    source("package.json"),
+  ]);
+  const packageMetadata = JSON.parse(packageSource);
 
   assert.match(
     workflow,
@@ -37,12 +41,25 @@ test("Pages workflow tests pull requests and gates deployment on master", async 
   assert.match(workflow, /push:\s*\n\s*branches:\s*\n\s*- master/);
   assert.doesNotMatch(workflow, /^\s*- main$/m);
   assert.match(workflow, /test:\s*\n\s*name: Test/);
+  assert.match(workflow, /fetch-depth: 0/);
+  assert.match(
+    workflow,
+    /github\.event_name == 'pull_request'[\s\S]*check-release-version\.mjs[\s\S]*pull_request\.base\.sha/,
+  );
+  assert.match(
+    workflow,
+    /github\.event_name == 'push'[\s\S]*check-release-version\.mjs[\s\S]*github\.event\.before/,
+  );
   assert.match(workflow, /deploy:[\s\S]*needs: test/);
   assert.match(workflow, /github\.ref == 'refs\/heads\/master'/);
   assert.match(workflow, /github\.event_name != 'pull_request'/);
   assert.match(
     workflow,
     /deploy:[\s\S]*permissions:[\s\S]*pages: write[\s\S]*id-token: write/,
+  );
+  assert.equal(
+    packageMetadata.scripts["release:bump"],
+    "node scripts/bump-release.mjs",
   );
 });
 
@@ -391,9 +408,10 @@ test("compact chrome keeps accessible status and mobile gesture policy", async (
     html,
     /class="visually-hidden"[\s\S]*id="liveAnnouncer"[\s\S]*aria-live="polite"/,
   );
-  assert.doesNotMatch(
+  assert.doesNotMatch(html, /class="status-panel"|id="statusMessage"|id="puzzleMeta"/);
+  assert.match(
     html,
-    /class="status-panel"|id="statusMessage"|id="puzzleMeta"|<footer\b/,
+    /<\/main>\s*<footer class="site-footer">\s*<small class="release-version" id="releaseVersion">v\d{6}r[1-9]\d*<\/small>\s*<\/footer>/,
   );
   assert.ok(viewport);
   assert.doesNotMatch(viewport, /user-scalable\s*=\s*no|maximum-scale\s*=\s*1/i);
@@ -410,4 +428,8 @@ test("compact chrome keeps accessible status and mobile gesture policy", async (
     /\.header-share-url\s*{[^}]*-webkit-touch-callout:\s*default;[^}]*user-select:\s*text;/s,
   );
   assert.match(styles, /\.share-feedback\s*{[^}]*position:\s*fixed;/s);
+  assert.match(
+    styles,
+    /\.site-footer\s*{[^}]*color:\s*var\(--subtle\);[^}]*font-variant-numeric:\s*tabular-nums;[^}]*text-align:\s*center;/s,
+  );
 });

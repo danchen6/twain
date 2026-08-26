@@ -737,6 +737,7 @@ async function main() {
           documentTitle: document.title,
           difficultySelectorPresent: Boolean(document.querySelector('[data-difficulty]:not(#board)')),
           footerPresent: Boolean(document.querySelector('footer')),
+          releaseVersion: document.querySelector('#releaseVersion')?.textContent.trim() ?? null,
           headerDateColor: headerDateStyle.color,
           headerDateFontSize: headerDateStyle.fontSize,
           headerDateLetterSpacing: headerDateStyle.letterSpacing,
@@ -826,7 +827,7 @@ async function main() {
       await evaluate("window.scrollTo(0, 0)");
       await delay(30);
       const layout = await evaluate(`(() => {
-        const selectors = 'button, .brand, .clue-disc, .board, #dailyDate';
+        const selectors = 'button, .brand, .clue-disc, .board, #dailyDate, .site-footer';
         const overflow = [...document.querySelectorAll(selectors)]
           .filter((element) => {
             const style = getComputedStyle(element);
@@ -839,6 +840,10 @@ async function main() {
           })
           .filter((rect) => rect.left < -0.5 || rect.right > window.innerWidth + 0.5);
         const board = document.querySelector('#board').getBoundingClientRect();
+        const gameCard = document.querySelector('.game-card').getBoundingClientRect();
+        const footerElement = document.querySelector('.site-footer');
+        const footer = footerElement.getBoundingClientRect();
+        const footerStyle = getComputedStyle(footerElement);
         const headerDate = document.querySelector('#dailyDate');
         const headerDateRect = headerDate.getBoundingClientRect();
         const headerDateStyle = getComputedStyle(headerDate);
@@ -871,6 +876,16 @@ async function main() {
         });
         return {
           board: { left: board.left, right: board.right, top: board.top, bottom: board.bottom, width: board.width, height: board.height },
+          gameCard: { bottom: gameCard.bottom },
+          footer: {
+            bottom: footer.bottom,
+            color: footerStyle.color,
+            fontSize: footerStyle.fontSize,
+            left: footer.left,
+            right: footer.right,
+            top: footer.top,
+          },
+          releaseVersion: footerElement.textContent.trim(),
           clues,
           documentWidth: document.documentElement.scrollWidth,
           innerHeight: window.innerHeight,
@@ -955,6 +970,13 @@ async function main() {
         `${label} has horizontal page overflow: ${JSON.stringify(layout)}`,
       );
       assert.deepEqual(layout.overflow, [], `${label} has clipped controls or clues`);
+      assert.match(layout.releaseVersion, /^v\d{6}r[1-9]\d*$/);
+      assert.equal(layout.footer.color, "rgb(139, 135, 130)");
+      assert.equal(layout.footer.fontSize, "11px");
+      assert.ok(
+        layout.footer.top >= layout.gameCard.bottom - 0.5,
+        `${label} footer overlaps the game card: ${JSON.stringify(layout.footer)}`,
+      );
       assert.deepEqual(
         layout.clues.filter((clue) => clue.glyphCount > 1 && !clue.isWide),
         [],
@@ -1003,7 +1025,7 @@ async function main() {
         `${label} toolbar is not ordered timer, daily progress, Clear: ${JSON.stringify(layout.toolbar)}`,
       );
       checks.push(
-        `${label}: no overflow, aligned clue glyphs, square board above the fold, and timer/progress/Clear toolbar order`,
+        `${label}: no overflow, aligned clue glyphs, square board above the fold, quiet release footer, and timer/progress/Clear toolbar order`,
       );
     };
 
@@ -1206,6 +1228,9 @@ async function main() {
           banner: bounds(document.querySelector('#privacyBanner')),
           decline: bounds(document.querySelector('#bannerDeclineButton')),
           documentWidth: document.documentElement.scrollWidth,
+          footer: bounds(document.querySelector('.site-footer')),
+          footerVisibility: getComputedStyle(document.querySelector('.site-footer')).visibility,
+          releaseVersion: bounds(document.querySelector('#releaseVersion')),
           innerHeight: window.innerHeight,
           innerWidth: window.innerWidth,
         };
@@ -1214,6 +1239,15 @@ async function main() {
       assert.ok(privacyLayout.banner.left >= -0.5);
       assert.ok(privacyLayout.banner.right <= privacyLayout.innerWidth + 0.5);
       assert.ok(privacyLayout.documentWidth <= privacyLayout.innerWidth);
+      if (viewport.width > 620) {
+        assert.equal(privacyLayout.footerVisibility, "hidden");
+      } else {
+        assert.equal(privacyLayout.footerVisibility, "visible");
+        assert.ok(
+          privacyLayout.releaseVersion.bottom <= privacyLayout.banner.top + 0.5,
+          `${viewport.width}x${viewport.height} release version overlaps the privacy banner`,
+        );
+      }
       for (const action of [privacyLayout.decline, privacyLayout.accept]) {
         assert.ok(action.left >= privacyLayout.banner.left - 0.5);
         assert.ok(action.right <= privacyLayout.banner.right + 0.5);
@@ -1577,7 +1611,8 @@ async function main() {
     assert.equal(currentState.shareButtonPresent, true);
     assert.equal(currentState.inlineHowToPresent, false);
     assert.equal(currentState.helpDialogOpen, false);
-    assert.equal(currentState.footerPresent, false);
+    assert.equal(currentState.footerPresent, true);
+    assert.match(currentState.releaseVersion, /^v\d{6}r[1-9]\d*$/);
     assert.equal(currentState.introCopyPresent, false);
     assert.equal(currentState.activeLine, "a");
     assert.equal(currentState.numberLineOpacity, "1");

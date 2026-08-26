@@ -30,6 +30,7 @@ Do not add a framework, package dependency, transpiler, bundler, runtime server,
 - Public daily numbering is launch-relative and independent of generation versions: Taiwan date 2026-08-26 is Twain #1, and every later Taiwan calendar date increments the number by one.
 - Seeded generation is deterministic. Changing output for an existing `(version, difficulty, seed)` requires a deliberate format-version decision; changing the daily date-to-seed contract requires a daily-run version decision.
 - Locale selection is presentation-only. It must not enter the Taiwan date key, public numbering, schedule, seeds, generated puzzle, rule state, or daily-play storage.
+- The checked-in footer release identifier uses `v{yymmdd}r{rev}` (for example, `v260827r1`). Its positive, unpadded Taiwan-date revision resets to `1` each day, advances once per completed app/runtime revision, and remains independent from puzzle, daily-run, storage, analytics-consent, and package versions.
 - UI input paths (pointer, tap, and keyboard) must call the same pure rule functions in `src/game.js`.
 - Third-party trademarks, logos, proprietary assets, and copied boards must not enter the repository. All gameplay assets and daily boards must be independently created.
 - Production code has no runtime package dependency and no build step.
@@ -37,12 +38,13 @@ Do not add a framework, package dependency, transpiler, bundler, runtime server,
 ## Commands
 
 ```sh
+npm run release:bump
 npm test
 npm run visual-qa
 python3 -m http.server 4173
 ```
 
-Run `npm test` after any generator, model, or interaction change. For UI changes, also perform the manual matrix in `docs/quality.md`.
+Run `npm run release:bump` exactly once after finishing an app/runtime revision; documentation, test, workflow, and journal-only changes do not advance it. Run `npm test` after any generator, model, or interaction change. For UI changes, also perform the manual matrix in `docs/quality.md`.
 
 ## Git commits
 

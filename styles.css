@@ -280,7 +280,26 @@ button:disabled {
 .page-shell {
   width: min(100% - 28px, 680px);
   margin: 0 auto;
-  padding: 20px 0 34px;
+  padding: 20px 0 16px;
+}
+
+.site-footer {
+  width: min(100% - 28px, 680px);
+  margin: 0 auto;
+  padding: 0 0 max(18px, env(safe-area-inset-bottom));
+  color: var(--subtle);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-align: center;
+}
+
+@media (min-width: 621px) {
+  body.has-privacy-banner .site-footer {
+    visibility: hidden;
+  }
 }
 
 .game-card {
