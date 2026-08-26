@@ -35,6 +35,7 @@ import {
   isLineComplete,
   lineIdAtTarget,
   nextExpectedClue,
+  rewindToPathCell,
   snapshotPlayState,
   totalPathLength,
   undoPlayState,
@@ -171,8 +172,7 @@ const CONFETTI_WAVE_INTERVAL = 560;
 
 let session = null;
 let timerHandle = null;
-let activePointerId = null;
-let lastPointerCell = null;
+let activePointerGesture = null;
 let shareFeedbackHandle = null;
 let headerShareCopyResetHandle = null;
 let shareFallbackCopiedMessage = "";
@@ -1375,8 +1375,7 @@ function initializeDailyRun(feedback = null) {
   if (session.dailyComplete) {
     syncCompletedStreak();
   }
-  activePointerId = null;
-  lastPointerCell = null;
+  activePointerGesture = null;
 
   canonicalizeLocation();
   updateDailyDate();
@@ -1487,18 +1486,7 @@ function localizedMoveMessage(result, target, attemptedLineId) {
   }
 }
 
-function acceptCell(target) {
-  if (session.stageCompleted) {
-    return false;
-  }
-
-  const attemptedLineId = session.activeLineId;
-  const result = applyMove(
-    session.puzzle,
-    session.paths,
-    session.activeLineId,
-    target,
-  );
+function acceptRuleResult(result, target, attemptedLineId) {
   const moveMessage = localizedMoveMessage(result, target, attemptedLineId);
 
   if (!result.accepted) {
@@ -1528,6 +1516,38 @@ function acceptCell(target) {
   }
 
   return true;
+}
+
+function acceptCell(target) {
+  if (session.stageCompleted) {
+    return false;
+  }
+
+  const attemptedLineId = session.activeLineId;
+  const result = applyMove(
+    session.puzzle,
+    session.paths,
+    attemptedLineId,
+    target,
+  );
+
+  return acceptRuleResult(result, target, attemptedLineId);
+}
+
+function rewindToCell(target) {
+  if (session.stageCompleted) {
+    return false;
+  }
+
+  const attemptedLineId = session.activeLineId;
+  const result = rewindToPathCell(
+    session.puzzle,
+    session.paths,
+    attemptedLineId,
+    target,
+  );
+
+  return acceptRuleResult(result, target, attemptedLineId);
 }
 
 function cellFromHit(hit) {
@@ -1579,17 +1599,21 @@ function selectLineForPointerStart(target) {
 }
 
 function dragToCell(target) {
-  const path = session.paths[session.activeLineId];
+  const lineId = session.activeLineId;
+  const path = session.paths[lineId];
 
   if (path.length === 0) {
     acceptCell(target);
     return;
   }
 
-  const existing = path.some((cell) => sameCell(cell, target));
+  const existingIndex = path.findIndex((cell) => sameCell(cell, target));
 
-  if (existing) {
-    acceptCell(target);
+  if (existingIndex >= 0) {
+    if (existingIndex === path.length - 2) {
+      acceptCell(target);
+    }
+
     return;
   }
 
@@ -1616,16 +1640,31 @@ function dragToCell(target) {
       col: tail.col + colStep,
     };
 
-    if (!acceptCell(next)) {
+    if (
+      session.activeLineId !== lineId ||
+      session.paths[lineId].some((cell) => sameCell(cell, next)) ||
+      !acceptCell(next)
+    ) {
       break;
     }
 
-    tail = session.paths[session.activeLineId].at(-1);
+    tail = session.paths[lineId].at(-1);
 
     if (!tail) {
       break;
     }
   }
+}
+
+function clickCell(target) {
+  const path = session.paths[session.activeLineId];
+
+  if (path.some((cell) => sameCell(cell, target))) {
+    rewindToCell(target);
+    return;
+  }
+
+  dragToCell(target);
 }
 
 function clearCurrentPuzzle() {
@@ -2045,37 +2084,57 @@ boardElement.addEventListener("pointerdown", (event) => {
 
   event.preventDefault();
   boardElement.focus({ preventScroll: true });
-  activePointerId = event.pointerId;
-  lastPointerCell = cellFromHit(hit);
-  selectLineForPointerStart(lastPointerCell);
-  boardElement.setPointerCapture?.(event.pointerId);
+  const startCell = cellFromHit(hit);
   const startedOnPath = Object.values(session.paths).some((path) =>
-    path.some((cell) => sameCell(cell, lastPointerCell)),
+    path.some((cell) => sameCell(cell, startCell)),
   );
-
-  if (!startedOnPath) {
-    acceptCell(lastPointerCell);
-  }
+  activePointerGesture = {
+    pointerId: event.pointerId,
+    startCell,
+    lastCell: startCell,
+    movedBetweenCells: false,
+    startedOnPath,
+  };
+  selectLineForPointerStart(startCell);
+  boardElement.setPointerCapture?.(event.pointerId);
 });
 
 boardElement.addEventListener("pointermove", (event) => {
-  if (event.pointerId !== activePointerId) {
+  const gesture = activePointerGesture;
+
+  if (!gesture || event.pointerId !== gesture.pointerId) {
     return;
   }
 
   event.preventDefault();
   const cell = cellFromHit(hitAtPointer(event));
 
-  if (!cell || sameCell(cell, lastPointerCell)) {
+  if (!cell) {
+    gesture.movedBetweenCells = true;
+    gesture.lastCell = null;
     return;
   }
 
-  lastPointerCell = cell;
+  if (gesture.lastCell && sameCell(cell, gesture.lastCell)) {
+    return;
+  }
+
+  if (!gesture.movedBetweenCells) {
+    gesture.movedBetweenCells = true;
+
+    if (!gesture.startedOnPath) {
+      dragToCell(gesture.startCell);
+    }
+  }
+
+  gesture.lastCell = cell;
   dragToCell(cell);
 });
 
-function releasePointer(event) {
-  if (event.pointerId !== activePointerId) {
+function releasePointer(event, { cancelled = false } = {}) {
+  const gesture = activePointerGesture;
+
+  if (!gesture || event.pointerId !== gesture.pointerId) {
     return;
   }
 
@@ -2083,12 +2142,17 @@ function releasePointer(event) {
     boardElement.releasePointerCapture(event.pointerId);
   }
 
-  activePointerId = null;
-  lastPointerCell = null;
+  activePointerGesture = null;
+
+  if (!cancelled && !gesture.movedBetweenCells) {
+    clickCell(gesture.startCell);
+  }
 }
 
 boardElement.addEventListener("pointerup", releasePointer);
-boardElement.addEventListener("pointercancel", releasePointer);
+boardElement.addEventListener("pointercancel", (event) => {
+  releasePointer(event, { cancelled: true });
+});
 
 boardElement.addEventListener("keydown", (event) => {
   if (event.metaKey || event.ctrlKey || event.altKey) {

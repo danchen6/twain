@@ -30,17 +30,35 @@
 
 The versioned localStorage record omits the deterministic schedule, regenerated puzzle, palette, transient `runningSince`, and derived completion flags. Restore re-derives the schedule, accepts only its current Taiwan date/stage, and replays every path and history snapshot through `applyMove()`. Stale, malformed, or illegal records reset to today's first selected stage. The three stage baselines are additive v2 fields used only to derive stage-level elapsed time, Hint count, and mistake count. Legacy records with all three absent restore safely with unknown per-stage deltas.
 
-## Cell intent
+## Rule transitions
 
-All input adapters resolve to an active line plus one target cell and call `applyMove(puzzle, paths, activeLineId, target)`.
+Every extension and one-cell keyboard backtrack resolves to an active line plus one target cell and calls `applyMove(puzzle, paths, activeLineId, target)`. An explicit click/tap on the body of a selected route instead calls the pure `rewindToPathCell()` transition.
 
 - Empty line: only that line's first clue (`1` or `A`) can start.
-- Existing active-line cell: the current tail is a quiet no-op. Moving to its immediate predecessor removes exactly the tail; repeating backtracks one cell at a time. Any older body cell is rejected without changing either line.
+- Existing active-line cell passed to `applyMove()`: the current tail is a quiet no-op. Moving to its immediate predecessor removes exactly the tail; repeating backtracks one cell at a time. Any older body cell is rejected without changing either line.
+- Existing active-line cell passed to `rewindToPathCell()`: the tail is a quiet no-op; any earlier cell removes the entire suffix after that cell in one immutable transition. Undo therefore restores the whole suffix removed by that one explicit click.
 - New cell: it must be adjacent to the active tail, absent from both lines, not wall-separated, not owned as a clue by the other line, and not an out-of-order clue.
 - Final clue: a line may finish before the board and cannot extend again unless undone. Completion waits for both valid lines to fill the board.
 - Completion is evaluated after every accepted extension.
 
-There is no visible line selector. Starting a pointer gesture on either line's clue or existing path selects that line automatically; pointer-down on an occupied path selects without applying a move. Pointer down supports tap-to-step and held pointer movement supports drawing. Keyboard `N` selects Number and `L` selects Letter; arrows move relative to the active tail; Enter/Space starts; Backspace undoes; `H` hints; `R` clears.
+### Correction-gesture invariant
+
+Do not collapse the immediate predecessor and older body into one generic “existing path” case. Every interaction change must preserve this matrix and its browser regressions:
+
+| Gesture | Existing-route target | Required result |
+| --- | --- | --- |
+| Click/tap | Current tail | Quiet no-op; line selection still applies. |
+| Click/tap | Any earlier cell | Select that route's owner and rewind directly to the target in one transition. |
+| Drag from the tail | Immediate predecessor | Backtrack exactly one cell; repeated predecessor crossings continue cell by cell. |
+| Drag from the tail | Any older non-predecessor body cell | Quiet no-op; never infer or delete the skipped suffix. |
+| Keyboard arrow | Immediate predecessor | Backtrack exactly one cell through `applyMove()`. |
+| Keyboard arrow | Any older non-predecessor body cell | Reject without changing either path. |
+
+There is no visible line selector. Starting a pointer gesture on either line's clue or existing path selects that line automatically. Pointer down only records the start cell and defers path mutation. Leaving the start cell for another cell (or leaving the board) permanently classifies that gesture as a drag: an unoccupied start is applied first when drawing continues across the board, subsequent cells draw from the current tail, and tracing the route's immediate predecessors backtracks one cell per crossed predecessor. Touching any older non-predecessor body cell is a quiet no-op, preventing an imprecise forward drag from deleting a long suffix. A fast jump to an older body cell does not infer the skipped backtracks.
+
+Pointer up without ever crossing a cell boundary is a click/tap. Clicking an existing route rewinds it directly to that cell. Clicking an unoccupied cell in the active tail's row or column applies every intermediate cell through `applyMove()` and stops at the first rejected rule transition; an adjacent click remains a one-cell move, while a non-adjacent diagonal click is a quiet no-op. This uses cell transitions rather than elapsed-time or pixel-distance thresholds, so a held-but-stationary pointer is still a click and any cross-cell movement remains a drag even if it returns to the start. Pointer cancellation never commits a click.
+
+Keyboard `N` selects Number and `L` selects Letter; arrows move relative to the active tail; Enter/Space starts; Backspace undoes; `H` hints; `R` clears.
 
 The active line is full opacity and the inactive line is faded; both return to full opacity on completion. The UI shows daily-stage progress but no occupancy or per-line quota.
 

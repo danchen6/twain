@@ -43,8 +43,8 @@ Taiwan timestamp
           -> validated two-line Puzzle
           -> seed-derived route palette
           -> restored or fresh DailyPlay state
-          -> pointer / touch / keyboard cell intent
-          -> applyMove (pure)
+          -> pointer / touch / keyboard gesture intent
+          -> applyMove / rewindToPathCell (pure)
           -> paths + outcome
           -> SVG/DOM render + versioned localStorage snapshot
 
@@ -69,7 +69,7 @@ Only the active stage is generated. This keeps initial rendering fast and moves 
 - `src/daily-state.js`: version/date/stage checks, legal replay of persisted paths and history, derived completion state, stage telemetry baselines, and storage-safe cloning. Invalid or stale records are rejected rather than partially trusted; legacy v2 records without baselines restore with unknown stage deltas.
 - `src/generator.js`: five difficulty profiles, seeded PRNG, Hamiltonian-path construction and two-line partitioning, clue/wall projection, score-based candidate selection, schema validation, and coordinate helpers.
 - `src/solver.js`: deterministic bounded search, pruning, first-solution effort, capped solution-density measurement, and difficulty scoring. It reads clues and walls but never witness paths.
-- `src/game.js`: legal moves, cell-by-cell backtracking and body-collision rejection, independent clue progression, full-board solved predicate, global Undo, Clear, and canonical Hint behavior.
+- `src/game.js`: legal moves, cell-by-cell predecessor backtracking, explicit immutable path-cell rewind, body-collision rejection, independent clue progression, full-board solved predicate, global Undo, Clear, and canonical Hint behavior.
 - `src/palette.js`: immutable curated gradient pairs and versioned deterministic selection from the stage seed.
 - `src/qr.js`: validates the canonical URL, invokes the pinned QR encoder at medium error correction, and converts its matrix into a compact SVG path with a four-module quiet zone.
 - `src/i18n.js`: the seven-locale catalog, autonyms, BCP 47 browser matching, English fallback, localized date formatting, Hint grammar, and flat UI message contract.
@@ -77,7 +77,7 @@ Only the active stage is generated. This keeps initial rendering fast and moves 
 - `src/streak.js`: validates and transitions the browser-local current/longest/total streak record against full Taiwan-date daily completions. Same-day and backward-date input cannot inflate counts.
 - `src/telemetry.js`: pure builders for bounded daily/stage start, Hint, stage-completion, and daily-completion outcomes. It owns parameter names and units but no transport or browser state.
 - `src/analytics.js`: explicit production GA configuration, versioned consent-record parsing/writing, scalar event sanitization, and lazy Google tag transport. It targets `G-BBJX7TJD6W` with debug mode off and creates no tag state or request until valid configuration and explicit permission both pass.
-- `src/main.js`: mutable daily lifecycle, numbered localized date identity, lazy stage loading, timer pause/resume, completion countdown and live day rollover, daily/locale/streak/consent localStorage I/O, localized privacy banner/dialog, event dispatch, the header language and QR/link menus, user-activation-safe result Web Share plus clipboard/selected-text/manual fallbacks, localized DOM/SVG rendering, and input normalization. Stable `applyMove().kind` values are translated at this UI boundary; the pure rule engine retains locale-independent behavior and messages.
+- `src/main.js`: mutable daily lifecycle, numbered localized date identity, lazy stage loading, timer pause/resume, completion countdown and live day rollover, daily/locale/streak/consent localStorage I/O, localized privacy banner/dialog, event dispatch, the header language and QR/link menus, user-activation-safe result Web Share plus clipboard/selected-text/manual fallbacks, localized DOM/SVG rendering, and input normalization. Pointer normalization distinguishes a cell-crossing drag from a stationary click without a timing threshold, interpolates orthogonal click/drag targets through `applyMove()`, and sends explicit path clicks to `rewindToPathCell()`. Stable rule-result kinds are translated at this UI boundary; the pure rule engine retains locale-independent behavior and messages.
 - `vendor/qrcode-generator.mjs`: exact vendored ESM distribution of `qrcode-generator` 2.0.4. Its MIT license and provenance remain in `vendor/qrcode-generator.LICENSE` and `THIRD_PARTY_NOTICES.md`.
 - `assets/twain-mark.svg`: fixed two-stroke brand geometry shared by the header and favicon; it stays independent from seed-selected gameplay palettes.
 - `assets/icons/`: the full-bleed canonical app-icon SVG plus opaque 180, 192, and 512px PNG derivatives. Important strokes stay inside the maskable safe zone; operating systems own the final corner/mask treatment.

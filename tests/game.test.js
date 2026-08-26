@@ -17,6 +17,7 @@ import {
   lineDisplayName,
   lineIdAtTarget,
   nextExpectedClue,
+  rewindToPathCell,
   snapshotPlayState,
   undoPlayState,
 } from "../src/game.js";
@@ -290,6 +291,56 @@ test("moving onto an older adjacent active-line cell is rejected", () => {
   assert.match(result.message, /one cell at a time/);
   assert.deepEqual(result.paths, before);
   assert.deepEqual(paths, before);
+});
+
+test("an explicit path-cell rewind removes the complete suffix immutably", () => {
+  const puzzle = createTwainFixture();
+  let paths = createEmptyPaths(puzzle);
+
+  for (const cell of puzzle.lines[0].solution.slice(0, 5)) {
+    paths = applyMove(puzzle, paths, "a", cell).paths;
+  }
+
+  paths = applyMove(puzzle, paths, "b", puzzle.lines[1].solution[0]).paths;
+  const before = structuredClone(paths);
+  const result = rewindToPathCell(
+    puzzle,
+    paths,
+    "a",
+    puzzle.lines[0].solution[1],
+  );
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.kind, "rewind");
+  assert.deepEqual(result.paths.a, puzzle.lines[0].solution.slice(0, 2));
+  assert.deepEqual(result.paths.b, before.b);
+  assert.deepEqual(paths, before);
+});
+
+test("an explicit path-cell rewind quietly ignores the tail and non-path cells", () => {
+  const puzzle = createTwainFixture();
+  let paths = createEmptyPaths(puzzle);
+
+  for (const cell of puzzle.lines[0].solution.slice(0, 3)) {
+    paths = applyMove(puzzle, paths, "a", cell).paths;
+  }
+
+  const tail = rewindToPathCell(
+    puzzle,
+    paths,
+    "a",
+    puzzle.lines[0].solution[2],
+  );
+  const absent = rewindToPathCell(puzzle, paths, "a", { row: 2, col: 3 });
+
+  assert.equal(tail.accepted, false);
+  assert.equal(tail.kind, "same-cell");
+  assert.equal(tail.quiet, true);
+  assert.equal(absent.accepted, false);
+  assert.equal(absent.kind, "not-on-path");
+  assert.equal(absent.quiet, true);
+  assert.equal(tail.paths, paths);
+  assert.equal(absent.paths, paths);
 });
 
 test("both complete witness lines are accepted as solved", () => {

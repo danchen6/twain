@@ -1790,16 +1790,41 @@ async function main() {
       "clue-driven line selection, global Undo, and timer-preserving current-board Clear work",
     );
 
-    await mouseDragCells(lineA.solution.slice(0, 8), easyPuzzle);
+    const straightClickCells = lineA.solution.slice(0, 3);
+    const straightClickStart = straightClickCells[0];
+    const straightClickTarget = straightClickCells.at(-1);
+    assert.ok(
+      straightClickCells.every((cell) => cell.row === straightClickStart.row) ||
+        straightClickCells.every((cell) => cell.col === straightClickStart.col),
+    );
+    assert.equal(
+      clueCells.has(`${straightClickTarget.row},${straightClickTarget.col}`),
+      false,
+    );
+    await clickCell(straightClickStart, easyPuzzle);
+    await clickCell(straightClickTarget, easyPuzzle);
+    assert.equal((await state()).progress, "3/25");
+
+    await mouseDragCells(lineA.solution.slice(2, 8), easyPuzzle);
+    assert.equal((await state()).progress, "8/25");
+    await clickCell(lineA.solution[5], easyPuzzle);
+    assert.equal((await state()).progress, "6/25");
+    await capture("1440x1000-daily-click-rewind", {
+      centerSelector: "#board",
+    });
+    await clickSelector("#undoButton");
     assert.equal((await state()).progress, "8/25");
     await mouseDragCells(
       [lineA.solution[7], lineA.solution[6], lineA.solution[5]],
       easyPuzzle,
     );
-    assert.equal((await state()).progress, "6/25");
-    await capture("1440x1000-daily-backtracking", {
+    currentState = await state();
+    assert.equal(currentState.progress, "6/25");
+    await capture("1440x1000-daily-drag-backtracking", {
       centerSelector: "#board",
     });
+    await clickSelector("#undoButton");
+    assert.equal((await state()).progress, "7/25");
 
     await clickSelector("#clearButton");
     const collision = findAdjacentBodyCollision(lineA.solution);
@@ -1807,15 +1832,16 @@ async function main() {
     await mouseDragCells(prefix, easyPuzzle);
     const collisionProgress = `${prefix.length}/25`;
     assert.equal((await state()).progress, collisionProgress);
+    const bodyCollisionBefore = await state();
     await mouseDragCells(
       [lineA.solution[collision.tailIndex], lineA.solution[collision.bodyIndex]],
       easyPuzzle,
     );
     currentState = await state();
     assert.equal(currentState.progress, collisionProgress);
-    assert.match(currentState.status, /one cell at a time/);
+    assert.equal(currentState.status, bodyCollisionBefore.status);
     checks.push(
-      "tail-first dragging backtracks cell by cell while non-predecessor body collisions are rejected",
+      "orthogonal clicks draw through intermediate cells, path clicks rewind directly, tail-first dragging backtracks cell by cell, and non-predecessor body collisions are quiet no-ops",
     );
 
     await clickSelector("#clearButton");
@@ -2263,6 +2289,38 @@ async function main() {
           sessionId,
         );
         assert.equal((await state()).progress, "6/100");
+
+        await cdp.call(
+          "Input.dispatchTouchEvent",
+          { type: "touchStart", touchPoints: touchPayload(touchPoints[5]) },
+          sessionId,
+        );
+        for (const point of [touchPoints[4], touchPoints[3]]) {
+          await cdp.call(
+            "Input.dispatchTouchEvent",
+            { type: "touchMove", touchPoints: touchPayload(point) },
+            sessionId,
+          );
+        }
+        await cdp.call(
+          "Input.dispatchTouchEvent",
+          { type: "touchEnd", touchPoints: [] },
+          sessionId,
+        );
+        assert.equal((await state()).progress, "4/100");
+
+        await cdp.call(
+          "Input.dispatchTouchEvent",
+          { type: "touchStart", touchPoints: touchPayload(touchPoints[2]) },
+          sessionId,
+        );
+        await cdp.call(
+          "Input.dispatchTouchEvent",
+          { type: "touchEnd", touchPoints: [] },
+          sessionId,
+        );
+        assert.equal((await state()).progress, "3/100");
+        await capture("390x844-daily-ultra-tap-rewind");
         await clickSelector("#clearButton");
         assert.equal((await state()).progress, "0/100");
 
@@ -2271,7 +2329,7 @@ async function main() {
         await capture("320x800-daily-ultra-fresh");
         await configureViewport({ width: 1440, height: 1000 });
         checks.push(
-          "Ultra renders above the fold at desktop and narrow mobile widths, and touch drawing/Clear preserve the stage",
+          "Ultra renders above the fold at desktop and narrow mobile widths, and touch drawing/tail backtracking/path-tap rewind/Clear preserve the stage",
         );
       }
 

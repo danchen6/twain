@@ -388,6 +388,58 @@ export function applyMove(puzzle, paths, activeLineId, target) {
   };
 }
 
+export function rewindToPathCell(puzzle, paths, activeLineId, target) {
+  const line = getLine(puzzle, activeLineId);
+
+  if (!line) {
+    throw new RangeError(`Unknown line: ${activeLineId}`);
+  }
+
+  if (!isInBounds(target, puzzle.rows, puzzle.cols)) {
+    return moveResult({
+      accepted: false,
+      paths,
+      activeLineId,
+      kind: "out-of-bounds",
+      quiet: true,
+      puzzle,
+    });
+  }
+
+  const path = paths[activeLineId] ?? [];
+  const targetIndex = path.findIndex((cell) => sameCell(cell, target));
+
+  if (targetIndex === path.length - 1 && path.length > 0) {
+    return moveResult({
+      accepted: false,
+      paths,
+      activeLineId,
+      kind: "same-cell",
+      quiet: true,
+      puzzle,
+    });
+  }
+
+  if (targetIndex < 0) {
+    return moveResult({
+      accepted: false,
+      paths,
+      activeLineId,
+      kind: "not-on-path",
+      quiet: true,
+      puzzle,
+    });
+  }
+
+  return moveResult({
+    accepted: true,
+    paths: copyPathsWith(paths, activeLineId, path.slice(0, targetIndex + 1)),
+    activeLineId,
+    kind: "rewind",
+    puzzle,
+  });
+}
+
 export function clearPaths(puzzle) {
   return createEmptyPaths(puzzle);
 }

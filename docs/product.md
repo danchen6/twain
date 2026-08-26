@@ -23,7 +23,7 @@ Twain is an MIT-licensed public preview. The preview asserts the documented puzz
 
 There is no required per-line length or cell quota. Generated witnesses prove solvability but do not prescribe the player's partition; any valid full-board partition wins.
 
-Moving from a line's tail to its immediate predecessor backtracks exactly one cell, so players can reverse naturally along the route. Moving onto any older body cell is rejected instead of deleting a long suffix. Undo remains the global chronological correction action.
+Clicking or tapping an earlier cell on a drawn route rewinds that route directly to the chosen cell so it can be redrawn. Dragging the tail through its immediate predecessors backtracks one cell at a time, while colliding with any older non-predecessor body cell is a quiet no-op. Keyboard movement to the immediate predecessor follows the same one-cell rule, and Undo remains the global chronological correction action.
 
 ## Daily run
 
@@ -63,7 +63,7 @@ Moving from a line's tail to its immediate predecessor backtracks exactly one ce
 
 ## Current scope
 
-- Pointer/touch drawing, tap-to-step, clue/path-driven line selection, keyboard arrows plus `N`/`L`, cell-by-cell backtracking, body-collision rejection, global Undo, Clear, and Hint.
+- Pointer/touch head drawing, orthogonal click/tap-to-draw, direct click/tap path rewind, clue/path-driven line selection, keyboard arrows plus `N`/`L`, cell-by-cell tail backtracking, quiet non-predecessor drag-body collisions, global Undo, Clear, and Hint.
 - Curated high-contrast route gradients selected deterministically from each stage seed.
 - Header Help opens the compact rule tutorial as a native modal. Header Share opens a separate QR/link modal; final-result Share retains the platform menu plus copy/manual fallbacks.
 - The rightmost header Language action exposes Automatic plus all seven locale autonyms without leaving the play surface.
