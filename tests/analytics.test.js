@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  ANALYTICS_CONFIG,
   ANALYTICS_CONSENT_STORAGE_KEY,
   createAnalyticsClient,
   isGoogleTagId,
@@ -15,6 +16,15 @@ import {
   levelEndEvent,
   levelStartEvent,
 } from "../src/telemetry.js";
+
+test("production analytics targets the approved GA4 stream without debug mode", () => {
+  assert.deepEqual(ANALYTICS_CONFIG, {
+    enabled: true,
+    measurementId: "G-BBJX7TJD6W",
+    debug: false,
+  });
+  assert.equal(Object.isFrozen(ANALYTICS_CONFIG), true);
+});
 
 function fakeEnvironment(consent = "granted") {
   const scripts = [];

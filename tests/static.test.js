@@ -81,8 +81,6 @@ test("optional analytics remains consent-gated and absent from static markup", a
   assert.match(html, /id="privacyDialog"/);
   assert.match(html, /id="privacyPreferencesButton"/);
   assert.doesNotMatch(html, /googletagmanager|google-analytics/);
-  assert.match(analyticsSource, /enabled: false/);
-  assert.match(analyticsSource, /measurementId: ""/);
   assert.match(
     analyticsSource,
     /readAnalyticsConsent\(storage\)\?\.state !== "granted"/,

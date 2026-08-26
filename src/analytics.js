@@ -5,8 +5,8 @@ export const ANALYTICS_CONSENT_STATES = Object.freeze([
   "denied",
 ]);
 export const ANALYTICS_CONFIG = Object.freeze({
-  enabled: false,
-  measurementId: "",
+  enabled: true,
+  measurementId: "G-BBJX7TJD6W",
   debug: false,
 });
 

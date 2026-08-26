@@ -9,6 +9,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { ANALYTICS_CONFIG } from "../../../../src/analytics.js";
+
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(SCRIPT_DIRECTORY, "../../../..");
 const FIXED_DATE_KEY = "2026-08-29";
@@ -380,6 +382,16 @@ async function main() {
       cdp.call("Runtime.enable", {}, sessionId),
       cdp.call("Log.enable", {}, sessionId),
       cdp.call("Network.enable", {}, sessionId),
+      cdp.call(
+        "Fetch.enable",
+        {
+          patterns: [
+            { urlPattern: "*googletagmanager.com*" },
+            { urlPattern: "*google-analytics.com*" },
+          ],
+        },
+        sessionId,
+      ),
     ]);
     await cdp.call(
       "Page.addScriptToEvaluateOnNewDocument",
@@ -439,10 +451,33 @@ async function main() {
         pageErrors.push(message.params.entry.text);
       }
 
-      if (message.method === "Network.requestWillBeSent") {
+      if (message.method === "Fetch.requestPaused") {
+        const requestId = message.params?.requestId;
         const url = message.params?.request?.url ?? "";
-        if (/google-analytics\.com|googletagmanager\.com/.test(url)) {
+
+        if (
+          requestId &&
+          /google-analytics\.com|googletagmanager\.com/.test(url)
+        ) {
           analyticsRequests.push(url);
+          const isTagScript = /googletagmanager\.com\/gtag\/js/.test(url);
+          const response = {
+            requestId,
+            responseCode: isTagScript ? 200 : 204,
+            responseHeaders: isTagScript
+              ? [{ name: "Content-Type", value: "application/javascript" }]
+              : [],
+          };
+
+          if (isTagScript) {
+            response.body = "";
+          }
+
+          void cdp
+            .call("Fetch.fulfillRequest", response, sessionId)
+            .catch((error) =>
+              pageErrors.push(`Analytics interception failed: ${error.message}`),
+            );
         }
       }
     });
@@ -711,6 +746,13 @@ async function main() {
           modeSelectorPresent: Boolean(document.querySelector('[data-mode]')),
           newButtonPresent: Boolean(document.querySelector('#newBoardButton, #newPuzzleButton')),
           numberLineOpacity: numberLineClue ? getComputedStyle(numberLineClue).opacity : null,
+          analyticsConfiguration: (() => {
+            if (!Array.isArray(window.dataLayer)) return null;
+            const command = window.dataLayer.find((entry) => entry?.[0] === 'config');
+            return command
+              ? { measurementId: command[1], parameters: command[2] }
+              : null;
+          })(),
           analyticsConsent: storedJson('twain:analytics-consent:v1'),
           analyticsDataLayerPresent: Array.isArray(window.dataLayer),
           analyticsTagPresent: Boolean(document.querySelector('#twain-google-tag')),
@@ -1107,6 +1149,12 @@ async function main() {
       { width: 320, height: 800, mobile: true },
     ];
 
+    assert.deepEqual(ANALYTICS_CONFIG, {
+      enabled: true,
+      measurementId: "G-BBJX7TJD6W",
+      debug: false,
+    });
+
     for (const viewport of privacyViewports) {
       await loadViewport({ ...viewport, consent: "unset" });
       const privacyState = await state();
@@ -1180,6 +1228,7 @@ async function main() {
     assert.equal(privacyState.analyticsConsent.version, 1);
     assert.equal(privacyState.analyticsTagPresent, false);
     assert.equal(privacyState.analyticsDataLayerPresent, false);
+    assert.deepEqual(analyticsRequests, []);
 
     await loadViewport({
       width: 390,
@@ -1203,9 +1252,24 @@ async function main() {
     privacyState = await state();
     assert.equal(privacyState.privacyDialogOpen, false);
     assert.equal(privacyState.analyticsConsent.state, "granted");
-    assert.equal(privacyState.analyticsTagPresent, false);
-    assert.equal(privacyState.analyticsDataLayerPresent, false);
+    assert.equal(privacyState.analyticsTagPresent, true);
+    assert.equal(privacyState.analyticsDataLayerPresent, true);
+    assert.deepEqual(privacyState.analyticsConfiguration, {
+      measurementId: ANALYTICS_CONFIG.measurementId,
+      parameters: {
+        send_page_view: true,
+        allow_google_signals: false,
+        allow_ad_personalization_signals: false,
+      },
+    });
     assert.equal(privacyState.activeElement, "helpButton");
+
+    for (let attempt = 0; attempt < 50 && analyticsRequests.length === 0; attempt += 1) {
+      await delay(20);
+    }
+    assert.deepEqual(analyticsRequests, [
+      `https://www.googletagmanager.com/gtag/js?id=${ANALYTICS_CONFIG.measurementId}`,
+    ]);
 
     await loadViewport({
       width: 390,
@@ -1214,10 +1278,28 @@ async function main() {
       fresh: false,
       consent: "preserve",
     });
-    assert.equal((await state()).analyticsConsent.state, "granted");
-    assert.deepEqual(analyticsRequests, []);
+    privacyState = await state();
+    assert.equal(privacyState.analyticsConsent.state, "granted");
+    assert.equal(privacyState.analyticsTagPresent, true);
+    assert.equal(privacyState.analyticsDataLayerPresent, true);
+
+    await clickSelector("#helpButton");
+    await clickSelector("#privacyPreferencesButton");
+    const reloadedAfterRevocation = cdp.waitFor(
+      "Page.loadEventFired",
+      sessionId,
+    );
+    const requestsBeforeRevocation = analyticsRequests.length;
+    await clickSelector("#privacyDeclineButton");
+    await reloadedAfterRevocation;
+    await delay(100);
+    privacyState = await state();
+    assert.equal(privacyState.analyticsConsent.state, "denied");
+    assert.equal(privacyState.analyticsTagPresent, false);
+    assert.equal(privacyState.analyticsDataLayerPresent, false);
+    assert.equal(analyticsRequests.length, requestsBeforeRevocation);
     checks.push(
-      "privacy banner and details fit all maintained viewports; decline/grant persist, Help reopens choices, and disabled analytics creates no Google tag or request",
+      "privacy banner and details fit all maintained viewports; undecided and declined visits are tag-free, consent initializes only the configured intercepted GA tag, and active revocation reloads tag-free",
     );
 
     await loadViewport({
@@ -2522,7 +2604,12 @@ async function main() {
     );
     checks.push("keyboard focus reaches the board without a blue outer outline");
 
-    assert.deepEqual(analyticsRequests, [], "Disabled analytics made a Google request.");
+    assert.ok(analyticsRequests.length >= 1, "Consented analytics made no tag request.");
+    assert.deepEqual(
+      [...new Set(analyticsRequests)],
+      [`https://www.googletagmanager.com/gtag/js?id=${ANALYTICS_CONFIG.measurementId}`],
+      "Analytics requested an unexpected endpoint.",
+    );
     assert.deepEqual(pageErrors, [], `Browser errors: ${pageErrors.join("\n")}`);
     checks.push("no runtime or browser-console errors");
 

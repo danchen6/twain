@@ -20,7 +20,7 @@ This file contains unresolved questions, carried risks, and work deliberately de
 
 ## Analytics and privacy
 
-- [ ] Before enabling Google Analytics in production, obtain the GA4 web-stream ID, review the notice/legal basis, consent-expiry/re-prompt policy, and Google account/data-retention settings for the intended jurisdictions, configure the recommended custom definitions plus `daily_run_complete` key event, and verify every event in DebugView. Also prove with a fresh profile/network trace that undecided and declined visits load no Google tag.
+- [ ] Complete the account-side rollout for GA4 stream `G-BBJX7TJD6W`: review the notice/legal basis, consent-expiry/re-prompt policy, and Google account/data-retention settings for the intended jurisdictions; configure the recommended custom definitions plus `daily_run_complete` key event; and verify every event in DebugView before treating analytics as fully validated.
 - [ ] Decide whether the browser-local consent timestamp is sufficient for the rollout's compliance/audit requirements. It is intentionally compatible with the static architecture but disappears when site data is cleared and cannot provide a central ledger or cross-device withdrawal; those requirements would need a separately approved service or consent platform.
 
 ## Quality automation

@@ -2,13 +2,13 @@
 
 ## Operating contract
 
-Twain's Google Analytics 4 integration is optional and disabled by default. `src/analytics.js` loads the Google tag only when all three gates are true:
+Twain's optional Google Analytics 4 integration is production-configured for web stream `G-BBJX7TJD6W`, with debug mode off. `src/analytics.js` loads the Google tag only when all three gates are true:
 
 1. `ANALYTICS_CONFIG.enabled` is `true`;
 2. `ANALYTICS_CONFIG.measurementId` is a valid `G-…` or `GT-…` identifier; and
 3. this browser has an explicit `granted` consent record.
 
-Until then, Twain creates no Google tag, `dataLayer`, or analytics request. A first visit shows the localized bottom privacy banner with direct **Decline** and **Allow analytics** actions. **Privacy details** explains the data boundary. The same choices remain available from Help → **Privacy choices**; revocation updates consent and reloads into a tag-free page.
+Until all three gates pass, Twain creates no Google tag, `dataLayer`, or analytics request. A first visit shows the localized bottom privacy banner with direct **Decline** and **Allow analytics** actions. **Privacy details** explains the data boundary. The same choices remain available from Help → **Privacy choices**; revocation updates consent and reloads into a tag-free page.
 
 `twain:analytics-consent:v1` is a browser-local JSON record:
 
@@ -20,7 +20,7 @@ Until then, Twain creates no Google tag, `dataLayer`, or analytics request. A fi
 }
 ```
 
-The state is `granted` or `denied`; malformed records are treated as no choice. If localStorage cannot persist the choice, analytics stays disabled and the banner remains. This is an on-device preference record, not a centrally auditable consent ledger: clearing site data removes it, and choices do not synchronize across devices. A material change to the analytics vendor, purpose, or disclosed data boundary requires a new consent-storage version and a fresh choice; filling the currently disclosed GA Measurement ID does not.
+The state is `granted` or `denied`; malformed records are treated as no choice. If localStorage cannot persist the choice, analytics stays disabled and the banner remains. This is an on-device preference record, not a centrally auditable consent ledger: clearing site data removes it, and choices do not synchronize across devices. A material change to the analytics vendor, purpose, or disclosed data boundary requires a new consent-storage version and a fresh choice. Configuring the disclosed GA stream did not change that boundary, so consent record v1 remains valid.
 
 The Google tag uses basic consent behavior. No tag is loaded before permission or after a declined page load. When permission is granted, analytics storage is granted while ad storage, ad user data, ad personalization, Google signals, and ad-personalization signals remain denied or disabled. The canonical URL is stripped of query parameters and fragments before the tag can send its initial page view.
 
@@ -53,12 +53,15 @@ Twain deliberately does not send puzzle paths, individual moves, puzzle seeds, c
 
 ## GA4 rollout
 
-1. Create a GA4 web data stream for the canonical Pages URL and complete the applicable Google/privacy settings review.
-2. Put its ID into `ANALYTICS_CONFIG.measurementId` and set `enabled: true`. Keep `debug: false` in production.
-3. In a non-production verification run, temporarily enable `debug`, grant analytics, and confirm the page view and all five gameplay events in DebugView. Verify that a fresh undecided or declined browser makes no request to Google tag hosts.
-4. Mark `daily_run_complete` as a key event.
-5. Register only parameters needed for reporting. Recommended event-scoped dimensions are `daily_run_version`, `display_mode`, `ui_locale`, `level_name`, `stage_number`, `stage_count`, `board_cells`, and `corrected`. Recommended custom metrics are elapsed-time fields, Hint/mistake fields, `occupied_cells`, and streak/completed-day fields.
-6. Do not register `daily_number` as a custom dimension or metric: the value grows indefinitely, and aggregating puzzle numbers is not meaningful. Use GA's date dimension for routine trends and the raw numeric parameter in an export for puzzle-specific investigation.
+The committed production configuration targets `G-BBJX7TJD6W`, sets `enabled: true`, and keeps `debug: false`. Repository-side browser verification intercepts the remote tag so QA cannot pollute production analytics; it proves that undecided and declined sessions are request-free, a grant initializes only the configured tag, and active revocation reloads into a tag-free page.
+
+The remaining account-side and end-to-end rollout work is:
+
+1. Complete the applicable Google account, data-retention, notice/legal-basis, and consent-expiry/re-prompt review for the intended jurisdictions.
+2. In a non-production verification run, temporarily enable `debug`, grant analytics, and confirm the page view and all five gameplay events in DebugView. Restore `debug: false` before deployment.
+3. Mark `daily_run_complete` as a key event.
+4. Register only parameters needed for reporting. Recommended event-scoped dimensions are `daily_run_version`, `display_mode`, `ui_locale`, `level_name`, `stage_number`, `stage_count`, `board_cells`, and `corrected`. Recommended custom metrics are elapsed-time fields, Hint/mistake fields, `occupied_cells`, and streak/completed-day fields.
+5. Do not register `daily_number` as a custom dimension or metric: the value grows indefinitely, and aggregating puzzle numbers is not meaningful. Use GA's date dimension for routine trends and the raw numeric parameter in an export for puzzle-specific investigation.
 
 ## Recommended analysis
 

@@ -48,7 +48,7 @@ Moving from a line's tail to its immediate predecessor backtracks exactly one ce
 
 ## Privacy and measurement
 
-- Optional Google Analytics is present as a disabled integration mechanism; no Measurement ID is configured. The Google tag is never loaded unless a valid ID is deliberately enabled and the current browser has explicitly allowed analytics.
+- Optional Google Analytics is configured for the production web stream `G-BBJX7TJD6W`. The Google tag is never loaded unless that valid configuration remains enabled and the current browser has explicitly allowed analytics.
 - With no saved choice, a localized bottom banner presents direct **Decline**, **Allow analytics**, and **Privacy details** actions. Help → **Privacy choices** lets the player review and change the choice later. Declining keeps the page tag-free; revoking after activation reloads into that tag-free state.
 - The browser-local consent record contains only the decision, schema version, and decision time. It is not an account-level or centrally auditable record and disappears with cleared site data.
 - Consented analytics is outcome-level: daily/stage starts and completions, elapsed time, Hint/mistake totals, streak totals, interface locale, display mode, and bounded board context. Paths, individual moves, seeds, names, email, account IDs, and free text are excluded.
@@ -67,10 +67,10 @@ Moving from a line's tail to its immediate predecessor backtracks exactly one ce
 - Curated high-contrast route gradients selected deterministically from each stage seed.
 - Header Help opens the compact rule tutorial as a native modal. Header Share opens a separate QR/link modal; final-result Share retains the platform menu plus copy/manual fallbacks.
 - The rightmost header Language action exposes Automatic plus all seven locale autonyms without leaving the play surface.
-- A localized privacy banner and modal consent manager gate the disabled-by-default analytics adapter; Help provides the persistent re-entry point.
+- A localized privacy banner and modal consent manager gate the production-configured analytics adapter; Help provides the persistent re-entry point.
 - Shared links expose a rich social card, and supported browsers can add Twain to the Home Screen with dedicated branding and standalone launch chrome.
 - Mobile play suppresses accidental double-tap zoom and long-press selection while preserving pinch zoom away from the board.
-- Responsive static Web UI hosted without a build, package install, CDN, external QR service, or application runtime service. A future explicitly enabled and consented GA tag is the only optional third-party runtime request.
+- Responsive static Web UI hosted without a build, package install, CDN, external QR service, or application runtime service. The explicitly enabled GA tag is the only optional third-party runtime request, and it remains unreachable without browser-local consent.
 
 The game remains single-player. Accounts, cross-device sync, historical-date selection, custom seeds, a puzzle archive, visible streak/history UI, leaderboards, and social collaboration are not current scope.
 
