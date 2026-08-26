@@ -1,0 +1,26 @@
+{
+  "id": "./",
+  "lang": "en",
+  "name": "Twain — Never the twain shall meet",
+  "short_name": "Twain",
+  "description": "Guide two paths through every cell without letting them meet. A new Twain puzzle run arrives every Taiwan day.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f5f2",
+  "theme_color": "#f7f5f2",
+  "icons": [
+    {
+      "src": "./assets/icons/twain-app-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./assets/icons/twain-app-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

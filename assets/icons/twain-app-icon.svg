@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#191919" />
+  <path
+    d="M224 304H800"
+    fill="none"
+    stroke="#20B7D4"
+    stroke-linecap="round"
+    stroke-width="144"
+  />
+  <path
+    d="M512 496V800"
+    fill="none"
+    stroke="#F97714"
+    stroke-linecap="round"
+    stroke-width="144"
+  />
+</svg>

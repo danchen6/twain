@@ -1,21 +1,75 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" prefix="og: https://ogp.me/ns#">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
+      id="metaDescription"
       name="description"
-      content="Play today's Twain puzzle run. Never the twain shall meet."
+      content="Guide two paths through every cell without letting them meet. A new Twain puzzle run arrives every Taiwan day."
     />
     <meta name="theme-color" content="#f7f5f2" />
+    <meta name="application-name" content="Twain" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Twain" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <meta property="og:title" content="Twain — Never the twain shall meet" />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:description"
+      content="Guide two paths through every cell without letting them meet. A new Twain puzzle run arrives every Taiwan day."
+    />
+    <meta property="og:url" content="https://danchen6.github.io/twain/" />
+    <meta property="og:site_name" content="Twain" />
+    <meta property="og:locale" content="en_US" />
+    <meta
+      property="og:image"
+      content="https://danchen6.github.io/twain/assets/social/twain-og-v2.png"
+    />
+    <meta
+      property="og:image:secure_url"
+      content="https://danchen6.github.io/twain/assets/social/twain-og-v2.png"
+    />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Twain's nearly completed two-line puzzle board beside the invitation: Two paths. Every cell. Can you solve the grid? 3–5 fresh challenges every day."
+    />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Twain — Never the twain shall meet" />
+    <meta
+      name="twitter:description"
+      content="Guide two paths through every cell without letting them meet. A new Twain puzzle run arrives every Taiwan day."
+    />
+    <meta
+      name="twitter:image"
+      content="https://danchen6.github.io/twain/assets/social/twain-og-v2.png"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="Twain's nearly completed two-line puzzle board beside the invitation: Two paths. Every cell. Can you solve the grid? 3–5 fresh challenges every day."
+    />
+
     <title>Twain — Never the twain shall meet</title>
+    <link rel="canonical" href="https://danchen6.github.io/twain/" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="./assets/icons/apple-touch-icon.png"
+    />
     <link rel="stylesheet" href="./styles.css" />
     <link rel="icon" href="./assets/twain-mark.svg" type="image/svg+xml" />
     <script type="module" src="./src/main.js"></script>
   </head>
   <body>
     <header class="site-header">
-      <a class="brand" href="./" aria-label="Twain home">
+      <a class="brand" id="homeLink" href="./" aria-label="Twain home">
         <img
           class="brand-mark"
           src="./assets/twain-mark.svg"

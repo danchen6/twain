@@ -7,7 +7,7 @@ Twain should feel quick, crisp, warm, and quietly playful. The compact header ce
 ## Visual language
 
 - Warm off-white canvas and white elevated surfaces.
-- The Twain mark is a near-black rounded square containing exactly two disjoint, round-capped strokes: a cyan horizontal cap and an orange vertical stem. Their visible junction gap makes a capital `T` without letting the strokes meet. Use the same SVG in the header and favicon so the mark remains crisp at small sizes.
+- The Twain mark is a near-black rounded square containing exactly two disjoint, round-capped strokes: a cyan horizontal cap and an orange vertical stem. Their visible junction gap makes a capital `T` without letting the strokes meet. Use the same SVG in the header and favicon so the mark remains crisp at small sizes. Install icons preserve that geometry on an opaque, full-bleed near-black field without baking in rounded corners; the operating system applies its own mask.
 - Near-black typography with separate numeric and alphabetic clue systems.
 - The Number line uses round black `1, 2, 3…` clues and the Letter line uses square black `A, B, C…` clues, both with white type. Shape and sequence identify clues without color.
 - Routes use one of several curated, high-contrast gradient pairs selected from the stage seed. Color identifies drawn routes and state accents.
@@ -20,6 +20,13 @@ Twain should feel quick, crisp, warm, and quietly playful. The compact header ce
 - Motion is brief and functional. Completion earns one cheerful veil/panel/confetti entrance; gameplay state does not animate continuously. The burst uses a generous mix of large strips, dots, and short pieces with full-turn spins so the celebration reads clearly across the board instead of looking like subtle decoration. Each particle gets seeded variation in its perimeter origin, initial velocity, upward lift, downward gravity, horizontal drift, size, rotation, and delay. Its 0.42–0.56 second path samples a gravity-driven parabola rather than interpolating one straight line. Intermediate completion emits one wave from all eight perimeter directions; daily completion emits three different waves at the same speed. Respect `prefers-reduced-motion`.
 
 CSS custom properties in `styles.css` are the executable token source. Change the tokens and this contract together when the visual language changes.
+
+## Social and install artwork
+
+- The canonical social card is an opaque 1200×630 PNG with a versioned filename. Its App Store-style hierarchy leads with one large benefit/rule statement, uses a magnified real near-complete board crop as the product hero, and leaves generous warm negative space so it survives small feed previews. Both paths must be visible and independently in progress, with neither final clue reached and no completion overlay. The source board must predate the numbered public run or otherwise be unreachable as a playable daily puzzle, so evergreen artwork never becomes a solution spoiler.
+- The fixed card headline is **Two paths. Every cell. Can you solve the grid?**, followed by **3–5 fresh challenges every day.** The direct question and daily value proposition stand on their own without a category capsule or printed site URL. The card contains no daily number, date, completed route, user result, or locale-specific state that could become stale or misrepresent gameplay. The board may communicate near-completion, but must not expose the fully solved state.
+- A low-contrast warm paper background plus sparse neutral circle, square, dot, and orthogonal-line motifs provides atmosphere without competing with the real board. Large decorative colored paths are excluded because they can read as part of the board hero. The Twain mark, words, clue glyphs, and board remain exact SVG/text/real rendered UI.
+- Apple touch and manifest icons use the cyan cap and orange stem on an opaque near-black full-bleed square. Both strokes remain inside the manifest maskable safe zone; the source has no transparency, pre-rendered gloss, shadow, or platform-specific corner radius.
 
 ## Page anatomy
 
